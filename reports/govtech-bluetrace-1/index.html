@@ -1,0 +1,4040 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- 2020-08-05 Wed 12:17 -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Static Analysis of TraceTogether for Android</title>
+<meta name="generator" content="Org mode">
+<meta name="author" content="Zhuang Xinyu, Principal Researcher (xinyu@unwovenlabs.com)">
+<link rel="stylesheet" type="text/css" href="report.css" />
+<script src="report.js"></script>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2019 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">Static Analysis of TraceTogether for Android</h1>
+<div id="author">zerotypic (zerotypic@gmail.com)</div>
+<div id="toc" style="visibility: hidden"></div>
+
+<div id="outline-container-orgf06ba6f" class="outline-2">
+<h2 id="orgf06ba6f"><span class="section-number-2">1</span> Introduction</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+TraceTogether is a COVID-19 contact tracing mobile application developed
+by Singapore's Government Technology Agency (GovTech). Along with the
+closed-source TraceTogether app, GovTech has also released an open-source
+version known as OpenTrace, and a white paper describing the protocol used
+by TraceTogether, which they call BlueTrace.
+</p>
+
+<p>
+In this report, we conduct a detailed static analysis of TraceTogether on
+Android. Our research seeks to answer 3 main questions:
+</p>
+
+<ol class="org-ol">
+<li>Is the closed-source TraceTogether app identical or largely similar to
+the open source OpenTrace app?</li>
+<li>How does using TraceTogether impact a person's privacy?</li>
+<li>Does TraceTogether contain any security vulnerabilities?</li>
+</ol>
+
+<p>
+To answer these questions, we reverse engineered the TraceTogether app to
+uncover its architecture and inner workings. We focused on the backend
+components of TraceTogether, and ignored most of the UI-related code.
+</p>
+
+<p>
+This report assumes the reader is already familiar with the general
+concepts surrounding TraceTogether, and has read the BlueTrace protocol
+white paper.
+</p>
+
+<p>
+Internally, TraceTogether goes by the name BlueTrace, as can be seen by
+the Android application ID (<i>sg.gov.tech.bluetrace</i>). We will refer to the
+TraceTogether app as BlueTrace henceforth. Note that the BlueTrace white
+paper refers to "BlueTrace" as a protocol; in this report we will
+explicitly refer to the protocol as the "BlueTrace protocol".
+</p>
+
+<p>
+We conducted our analysis on BlueTrace version 2.0.15, downloaded from the
+Google Play Store. This is identical to the version that a regular user
+would install and use on their phone.
+</p>
+
+<p>
+A newer version, 2.1.4, was released after we had completed most of our
+analysis. We performed a differential analysis of the latest version and
+present our findings in Section <a href="#orge1adb53">8</a>.
+</p>
+</div>
+</div>
+
+
+<div id="outline-container-org66f22f2" class="outline-2">
+<h2 id="org66f22f2"><span class="section-number-2">2</span> Summary of Findings</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+We present a summary of our key findings here for ease of reference.
+</p>
+</div>
+
+<div id="outline-container-org802c4c0" class="outline-3">
+<h3 id="org802c4c0"><span class="section-number-3">2.1</span> BlueTrace and OpenTrace</h3>
+<div class="outline-text-3" id="text-2-1">
+<p>
+BlueTrace and OpenTrace are largely similar and appear to be descended
+from the same code base. BlueTrace adds a few new features: pausing,
+SwiftMED detection, a metrics component, and some new remote command
+features that we describe shortly.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org65599a2" class="outline-3">
+<h3 id="org65599a2"><span class="section-number-3">2.2</span> Privacy</h3>
+<div class="outline-text-3" id="text-2-2">
+<p>
+BlueTrace generally respects privacy, and keeps to its word on what data
+it collects. It does not track a user's physical location via Android's
+location system. Personal identification information that is stored
+locally is encrypted, and is never transmitted except during the initial
+registration phase.
+</p>
+</div>
+
+<div id="outline-container-org2accf1f" class="outline-4">
+<h4 id="org2accf1f"><span class="section-number-4">2.2.1</span> TempIDs</h4>
+<div class="outline-text-4" id="text-2-2-1">
+<p>
+BlueTrace uses TempIDs as a means of preserving privacy while exchanging
+contact tracing records. However, we found that TempIDs still pose a
+privacy risk: because they are publicly broadcasted, it is important that
+a particular TempID is never associated with some other personal
+information. For example, if a string containing a TempID is transmitted
+in clear along with the user's IP address, then a link would be
+established between that TempID and the IP address.
+</p>
+
+<p>
+We found that BlueTrace did not expose TempIDs to external parties. Only
+the BlueTrace app and the central server know what TempIDs were issued to
+a user. However, BlueTrace maintains a local store of TempIDs. This store
+is in clear, and an attacker with privileged access to BlueTrace would be
+able to read it. Such an attacker would thus be able to associate the user
+to the TempIDs. However, since this attack would require some form of
+compromise of the BlueTrace client, its impact is low. Please see Section
+<a href="#orgb535fd5">5.2.6</a> for more information.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgbdaec54" class="outline-4">
+<h4 id="orgbdaec54"><span class="section-number-4">2.2.2</span> Metrics</h4>
+<div class="outline-text-4" id="text-2-2-2">
+<p>
+BlueTrace contains a component that collects statistics and periodically
+sends them to a central server. This component was not present in
+OpenTrace. It collects the following data:
+</p>
+
+<ul class="org-ul">
+<li>some information about system state</li>
+<li>the number of contact tracing records collected over the period day</li>
+<li>the timestamp of the latest record collected</li>
+</ul>
+
+<p>
+An analytics component also exists, which is identical to the one in
+OpenTrace; it mostly sends error messages to a central server, with no
+sensitive information.
+</p>
+
+<p>
+Based on our analysis, the metrics and analytics components do not pose
+much of a privacy risk. It is possible for the metrics information to be
+used to infer some information about a user's location: for example, a
+relatively larger collection count would indicate more movement, or being
+in an area with more people.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgb3ee8b3" class="outline-4">
+<h4 id="orgb3ee8b3"><span class="section-number-4">2.2.3</span> Pause Feature</h4>
+<div class="outline-text-4" id="text-2-2-3">
+<p>
+BlueTrace has a pause feature that allows a user to manually pause contact
+tracing. We verified that this feature works as expected; when turned on,
+no contact tracing records are exchanged. Nevertheless, we recommend
+turning Bluetooth off as well should a user be concerned about their
+privacy.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgdee44e7" class="outline-4">
+<h4 id="orgdee44e7"><span class="section-number-4">2.2.4</span> Remote Command Activation</h4>
+<div class="outline-text-4" id="text-2-2-4">
+<p>
+BlueTrace's FCMService component allows the central server to remotely
+activate certain BlueTrace features. This component is also present in
+OpenTrace. The main features that can be activated remotely are scanning
+and advertising, which already run periodically. FCMService can also
+trigger BlueTrace to upload metrics to the server. We also verified that
+FCMService does not allow the central server to remotely unpause a paused
+BlueTrace app.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orga57b9ba" class="outline-3">
+<h3 id="orga57b9ba"><span class="section-number-3">2.3</span> Security</h3>
+<div class="outline-text-3" id="text-2-3">
+<p>
+BlueTrace appears to be written securely. We traced the flow of data from
+untrusted sources (remote BLE devices), and did not find any vulnerable
+uses of the data.
+</p>
+
+<p>
+BlueTrace uses the Gson library to JSON-deserialize untrusted data. This
+is done in a secure fashion, but any vulnerabilities in Gson would be of
+concern. BlueTrace also eventually writes the untrusted data into an
+SQLite database, but fortunately this is done using parameterized queries,
+and so SQL injection attacks are not possible.
+</p>
+
+<p>
+Some minor bugs were found as well, but they were assessed to have no
+security impact.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgb552346" class="outline-3">
+<h3 id="orgb552346"><span class="section-number-3">2.4</span> BlueTrace version 2.1.4</h3>
+<div class="outline-text-3" id="text-2-4">
+<p>
+We performed a quick analysis of the latest version of BlueTrace,
+2.1.4. We did not find any serious issues with this version, and our
+conclusions remain the same.
+</p>
+
+<p>
+BlueTrace 2.1.4 does include a new feature that allows it to manage
+SafeEntry check-ins. Part of this feature logs down check-ins in the
+database and stores it for 25 days. This has a minor privacy impact as an
+attacker with privileged access to BlueTrace would be able to see the
+check-ins. However, non-BlueTrace users are likely to have equivalent
+information stored in the history of the web browser they use to access
+SafeEntry.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org8e2e290" class="outline-3">
+<h3 id="org8e2e290"><span class="section-number-3">2.5</span> Conclusion</h3>
+<div class="outline-text-3" id="text-2-5">
+<p>
+BlueTrace is generally respectful of a user's privacy, with only one minor
+privacy issue relating to TempID storage. BlueTrace also does not appear
+to have any significant security flaws, and only a few minor bugs.
+</p>
+</div>
+</div>
+</div>
+
+
+<div id="outline-container-org85c8b12" class="outline-2">
+<h2 id="org85c8b12"><span class="section-number-2">3</span> Research Setup</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+We downloaded BlueTrace version 2.0.15 from Google Play Store <sup><a id="fnr.1" class="footref" href="#fn.1">1</a></sup> using
+an Android mobile phone (Samsung Note 5, SM-N920I) rooted via Magisk. The
+APK files residing in <code>/data/app/sg.gov.tech.bluetrace</code> were extracted for
+analysis.
+</p>
+
+<p>
+BlueTrace consists of multiple APK files. The main code resides in
+<code>base.apk</code>, while the other APK files are for resources, and a native
+library. On our ARM64 test device, the native library is
+<code>libsqlcipher.so</code>, which is the SQLCipher encrypted SQLite extension. We
+did not find any code in BlueTrace that actually uses this library.
+</p>
+
+<p>
+We performed a static analysis by decompiling the <code>base.apk</code> file using
+PNF Software's JEB decompiler (version 3.x). We also took a cursory look
+at the <code>libsqlcipher.so</code> native library in IDA Pro (version 7.5), and did
+not notice anything unusual.
+</p>
+
+<p>
+Earlier versions of BlueTrace (e.g. 1.6.1) used an obfuscator to protect
+the APK files, likely DexGuard. Obfuscation made the APK more difficult
+to decompile, and required more effort to debofuscate important parts of
+the code. Fortunately, in the version we looked at (2.0.15), obfuscation
+was fully removed, and symbols were also preserved. This made analysis far
+easier, and allowed us to be more thorough.
+</p>
+
+<p>
+Due to time and resource limitations, we only conducted a static analysis
+of BlueTrace. For a complete audit, we recommend conducting a dynamic
+analysis as well; in particular, the Bluetooth code should be tested
+against malformed inputs.
+</p>
+
+<p>
+We compared BlueTrace against the latest version of OpenTrace available on
+the OpenTrace GitHub repository (commit 7e0cdd8).
+</p>
+</div>
+</div>
+
+
+<div id="outline-container-orgd10b859" class="outline-2">
+<h2 id="orgd10b859"><span class="section-number-2">4</span> Architectural Overview</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+The main purpose of BlueTrace is to disseminate and collect contact
+tracing records, which are to be stored for a specified duration and
+provided to a health authority should the user of BlueTrace test positive
+for COVID-19. As such, BlueTrace needs to provide the following services:
+</p>
+
+<ul class="org-ul">
+<li><b>Scanning</b>: periodically scan for other BlueTrace devices in the vicinity,
+and exchange contact tracing records with all devices found.</li>
+<li><b>Advertising</b>: advertise that this device is a BlueTrace device, and
+exchange contact tracing records with any device that connects to it.</li>
+<li><b>Temporary ID management</b>: maintain a collection of usable BlueTrace
+Temporary IDs (TempIDs), retrieving them from the server when
+necessary.</li>
+<li><b>Uploading</b>: Send contact tracing records to the health authority.</li>
+<li><b>Purging</b>: Removal of expired contact tracing records.</li>
+</ul>
+
+<p>
+BlueTrace also provides a few other miscellaneous services:
+</p>
+
+<ul class="org-ul">
+<li><b>Metrics</b>: Collect metrics about the app and upload to a server</li>
+<li><b>Health Check</b>: Periodically perform sanity checks on BlueTrace's state,
+and fix any issues found.</li>
+<li><b>Pausing</b>: Temporarily pause BlueTrace collection.</li>
+<li><b>SwiftMED Detection</b>: Detect if the SwiftMED app is installed, and
+disable BlueTrace if so.</li>
+</ul>
+
+<p>
+The implementation of the above services are described in detail in
+Section <a href="#orgb1f5fc8">7</a>, except for the uploading service, which we
+did not analyze for this report.
+</p>
+
+<p>
+BlueTrace is written in Kotlin, as is OpenTrace. To reverse engineer
+BlueTrace, we used JEB, which decompiles APK files into Java. Based on our
+analysis, BlueTrace does not appear to use any native code. <sup><a id="fnr.2" class="footref" href="#fn.2">2</a></sup>
+</p>
+
+<p>
+The Java namespace used by BlueTrace is <i>sg.gov.tech.bluetrace</i>; unless
+otherwise specified, all package and class names mentioned in this report
+are relative to this namespace.
+</p>
+</div>
+
+<div id="outline-container-org5392f94" class="outline-3">
+<h3 id="org5392f94"><span class="section-number-3">4.1</span> Bluetooth Terminology</h3>
+<div class="outline-text-3" id="text-4-1">
+<p>
+BlueTrace devices communicate via Bluetooth Low Energy (BLE). In BLE
+terminology, in any connection, one device is known as the Central device,
+and the other is known as the Peripheral device. In general, Central
+devices can scan for nearby Peripheral devices, and Peripheral devices
+allow Central devices to find them by advertising their
+presence. BlueTrace acts as both a Central and Peripheral device at the
+same time.
+</p>
+
+<p>
+The Generic Attribute Profile (GATT) is the standard BLE profile used by
+most BLE devices, including BlueTrace. In Peripheral mode, BlueTrace
+exposes a service which contains characteristics, that are "variables" which
+can be read and written by a Central device. Reading and writing to
+characteristics allows BlueTrace devices to send and receive information
+between each other.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org2e958dd" class="outline-3">
+<h3 id="org2e958dd"><span class="section-number-3">4.2</span> User Identifiers</h3>
+<div class="outline-text-3" id="text-4-2">
+<p>
+As described in the white paper, a BlueTrace device sends temporary
+identifiers (TempIDs) to other devices for contact tracing purposes. These
+TempIDs are ephemeral and encrypted such that only a health authority
+possessing the secret key is able to decrypt them to obtain a permanent
+identifier. It is assumed this permanent identifier can be used to look up
+a user's personal identifying information from the database held by the
+health authority, e.g. their contact information.
+</p>
+
+<p>
+We also noticed the existence of another identifier, the TTID, which is
+stored on the device and used when performing cloud actions such as making
+Firebase function calls. We do not know if the TTID is equivalent to the
+permanent identifier that can be obtained when decrypting the
+TempID. However, because it does not change, and is unique to each user,
+it effectively functions as a permanent identifier of that user.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org6526cba" class="outline-2">
+<h2 id="org6526cba"><span class="section-number-2">5</span> Findings</h2>
+<div class="outline-text-2" id="text-5">
+<p>
+In this section, we describe our analysis of BlueTrace from privacy and
+security angles. The findings presented here are based on and reference
+our detailed investigation into the inner workers of BlueTrace, which we
+describe in Section <a href="#orgb1f5fc8">7</a>.
+</p>
+</div>
+
+<div id="outline-container-org0934474" class="outline-3">
+<h3 id="org0934474"><span class="section-number-3">5.1</span> Similarity to OpenTrace</h3>
+<div class="outline-text-3" id="text-5-1">
+<p>
+BlueTrace appears to be largely similar to OpenTrace. The main
+architecture and design are similar, as are the locations of the various
+components. As the version of BlueTrace we looked at was released after
+the OpenTrace source release, any differences are likely to be bug fixes
+or additional features added after the code bases diverged.
+</p>
+
+<p>
+Key differences we noted between the code bases are listed below.
+</p>
+
+<ul class="org-ul">
+<li><b>Pause feature</b>: BlueTrace has a feature that allows a user to pause it
+for a fixed amount of time. This is not present in OpenTrace.</li>
+
+<li><b>SwiftMED detection</b>: BlueTrace detects the presence of SwiftMED, which
+appears to be a custom version of BlueTrace for use by Singapore Armed
+Forces personnel.</li>
+
+<li><b>Metrics</b>: BlueTrace has an additional metrics component that is not
+present in OpenTrace, which regularly sends contact tracing statistics
+to a remote server.</li>
+
+<li><b>New FCMService features</b>: FCMService listens for messages sent from a
+remote server, via Firebase Cloud Messaging. BlueTrace performs
+additional actions based on the messages: it can issue commands to
+BluetoothMonitoringService, such as to start scanning, and can also
+request for metrics to be uploaded to the server. OpenTrace does not
+have these additional features.</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-orgfb1cbda" class="outline-3">
+<h3 id="orgfb1cbda"><span class="section-number-3">5.2</span> Privacy</h3>
+<div class="outline-text-3" id="text-5-2">
+<p>
+A major concern surrounding BlueTrace is to what extent it affects the
+privacy of its users. At a high level, there are three privacy-related
+questions to consider: "Who are you?", "Where are you?", and "Who was
+nearby you?" We wish to preserve a user's privacy by preventing an
+attacker from determining the answers to these questions; to do so we
+consider the types of personal information that an attacker could make
+use of.
+</p>
+
+<p>
+According to the TraceTogether website <sup><a id="fnr.3" class="footref" href="#fn.3">3</a></sup>,
+BlueTrace only collects three kinds of data:
+</p>
+
+<ol class="org-ol">
+<li>Personal identification information, e.g. NRIC number, phone number;
+stored remotely and never shared</li>
+<li>Contact tracing records; stored within the device and only uploaded to
+a remote server when contact tracing is required</li>
+<li>App analytics data; stored remotely</li>
+</ol>
+
+<p>
+At the same time, it also states that BlueTrace does not gather or make
+use of physical location information.
+</p>
+
+<p>
+In other words:
+</p>
+
+<ol class="org-ol">
+<li>The BlueTrace app and the remote server know the identity of the user</li>
+<li>Only the BlueTrace app will know who the user has been in contact with
+(and to a limited extent), outside of contact tracing being activated</li>
+<li>Neither the BlueTrace app nor the remote server know the physical
+location of the user.</li>
+</ol>
+
+<p>
+We thus need to verify the following:
+</p>
+
+<ol class="org-ol">
+<li>Personal identification information cannot be accessed by any other
+party besides the app and the remote server</li>
+<li>Contact tracing records stay on the device, except when contact tracing
+is initiated by a health authority</li>
+<li>Location information is never accessed, transmitted or stored</li>
+<li>Metadata (e.g. metrics, analytics) does not reveal contact tracing
+information nor location information.</li>
+</ol>
+
+<p>
+In addition, we also consider a few different threat scenarios, and what
+kinds of personal information about a user could be obtained by a
+malicious actor.
+</p>
+
+<p>
+Note that for this report, we do not go into the relative merits and flaws
+of centralized contact tracing record processing, nor the necessity of
+registering personal information with a central server (both of which
+BlueTrace does); our goal is to purely to verify the above guarantees.
+</p>
+</div>
+
+<div id="outline-container-org9a2aedd" class="outline-4">
+<h4 id="org9a2aedd"><span class="section-number-4">5.2.1</span> Source vs sink analysis</h4>
+<div class="outline-text-4" id="text-5-2-1">
+<p>
+When analyzing the flow of privacy-related information through a system,
+we can either begin at the sources where the information is obtained, or
+at the sinks where the data leaves the system (and e.g. enters another
+app, or a remote server). Static sink analysis on Android is tricky due to
+the sheer number of ways an app can send data over the network. As such,
+we focus on tracing the flow of said information through the app from the
+place where it was created, to verify that the information does not reach
+anywhere it should not.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org340f5b1" class="outline-4">
+<h4 id="org340f5b1"><span class="section-number-4">5.2.2</span> Firebase security</h4>
+<div class="outline-text-4" id="text-5-2-2">
+<p>
+BlueTrace makes use of Firebase for cloud operations. In this report, we
+assume the Firebase transport layer is secure from man-in-the-middle
+attacks, i.e. any data sent between the app and the remote server via 
+Firebase cannot be eavesdropped or modified, except in Section <a href="#org77792e0">5.2.11</a> where we consider the impact of an attacker that is able to
+eavesdrop on Firebase traffic.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org1b05a40" class="outline-4">
+<h4 id="org1b05a40"><span class="section-number-4">5.2.3</span> Identification and contact details</h4>
+<div class="outline-text-4" id="text-5-2-3">
+<p>
+Identification and contact details are gathered from the user during the
+registration process. This information includes a contact phone number,
+and also some other identifying information, such as the user's NRIC or
+passport number.
+</p>
+
+<p>
+As we describe in Section <a href="#org20c92a0">7.8</a>, once identification
+information is collected, BlueTrace will send the information to the
+server via a Firebase function call. At this point, we assume the data is
+safely stored on the server end; analysis of the server infrastructure is
+out of the scope of this report.
+</p>
+
+<p>
+At the same time, the identification information is also encrypted, and
+stored on disk as the preferences <code>ENCRYPTED_USER_DATA</code> and
+<code>ENCRYPTED_PHONE_NUMBER</code>. The encryption logic uses AES-GCM, and the
+secret key is generated and stored using Android's Keystore
+system. Barring any flaws in Keystore, this method of storing the data
+should be secure, and should be encrypted data be somehow leaked, it would
+not be possible to decrypt it without at least privileged access to the
+device.
+</p>
+
+<p>
+BlueTrace decrypts the identification information preferences only in one
+place: when displaying user profile information in the UI.
+</p>
+
+<p>
+Thus, as far as the BlueTrace client app is concerned, identification and
+contact details are kept private. While the information is actually
+present on the device and not just on the remote server, it is stored in
+an encrypted form.
+</p>
+
+<p>
+Note that an unencrypted identifier is stored on the device: the
+TTID. This value is stored in the preference <code>TTID</code>, and is transmitted
+whenever Firebase functions are called. However, given only the TTID, it
+would not be possible for a third party to determine a user's actual
+identity.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org2bacf18" class="outline-4">
+<h4 id="org2bacf18"><span class="section-number-4">5.2.4</span> Contact tracing records</h4>
+<div class="outline-text-4" id="text-5-2-4">
+<p>
+We verified that contact tracing records received by BlueTrace stay on the
+device and do not get transmitted to any remote location. When BlueTrace
+receives a contact tracing record, it processes it, and then saves it into
+an SQLite database <code>record_database</code>. As described in Section
+<a href="#org0b44d61">7.4.5</a> (Data Access Analysis), the only time contact
+tracing records are accessed from this database and transmitted out of the
+device is after contact tracing has been initiated. Thus, contact tracing
+records do not get uploaded to the server or anywhere else in normal use.
+</p>
+
+<p>
+Metadata related to the contact tracing data is transmitted however, which
+we will discuss in Section <a href="#org5fbe6a3">5.2.8</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgfe9ec08" class="outline-4">
+<h4 id="orgfe9ec08"><span class="section-number-4">5.2.5</span> TempIDs as a form of personal information</h4>
+<div class="outline-text-4" id="text-5-2-5">
+<p>
+As discussed previously, TempIDs can only be linked to a permanent user ID
+(and thus personal information) by decrypting them with a secret key
+(referred to as the TempID secret key), which only the health authority
+has. However, links between TempIDs and <i>other</i> identifying information might
+be possible. If, for example, it is known that a specific device sent out
+a particular TempID at a particular time, then collected contact tracing
+records could be looked up to see if they contain that TempID. If so, then
+it would be known that the device must have been nearby the location where
+the contact tracing record was received. We thus need to verify that
+TempIDs are never exposed such that they may be linked with some other
+identifying information.
+</p>
+
+<p>
+TempIDs are created by the remote server, and downloaded via a Firebase
+function call (see Section <a href="#org077dc54">7.3</a> for more details). We assume that
+the remote server and Firebase transport are secure. The downloaded
+TempIDs are kept in a local store managed by TempIDManager.
+</p>
+
+<p>
+We investigated all places where TempIDs are read from the local store,
+and determined that they only leave the app when they are sent in
+BlueTrace Encounter Messages, which do not contain any identifying
+information. We also looked at log messages; while BlueTrace does actually
+log messages containing TempIDs (see <code>TracerApp.thisDeviceMsg()</code>), they
+are only written when BlueTrace is compiled in debug mode, and thus do not
+appear on the non-debug versions of BlueTrace available on the Play Store.
+</p>
+
+<p>
+Finally, we verified that BlueTrace does not retain any of the contact
+tracing records sent to other devices (which would contain
+TempIDs). TempIDs are cached momentarily in memory in the <i>GattServer</i>
+component (<code>readPayloadMap</code>), but this cache is usually flushed once the
+record exchange is complete. It should thus be unlikely for a third
+party external to the app to obtain any TempIDs, or link them to the
+device.
+</p>
+
+<p>
+We next considered a scenario where an attacker might have privileged
+access to data within the BlueTrace app; for example, if BlueTrace was
+running on a compromised device, or some vulnerability was used to access
+data private to BlueTrace.
+</p>
+
+<p>
+In such a situation, an attacker <i>would</i> be able to access the local
+TempID store. As detailed in Section <a href="#org077dc54">7.3</a>, the store is backed by
+a file <code>tempIDs</code>, which contains a JSON-serialized list of TempIDs. There
+are usually enough TempIDs to last over a 24 hour period. TempIDs that
+have expired are not removed; they will only be removed when the file is
+overwritten, which happens when a new batch of TempIDs are downloaded (via
+<code>TempIDManager.getTemporaryIDs()</code>). The server decides when the next fetch
+time will be (the value can be found in the preference <code>NEXT_FETCH_TIME</code>);
+we found it to be an interval of around 12 hours on a test device. Also
+note that the <code>tempIDs</code> file will not be overwritten if new TempIDs could
+not be downloaded, e.g. due to lack of Internet connectivity.
+</p>
+
+<p>
+All TempIDs found in the local store (about 12 hours worth) would thus be
+linked to the device containing the store. An attacker with access to
+those TempIDs would then be able to link the device to any other device
+containing contact tracing records with matching TempIDs.
+</p>
+
+<p>
+We now consider a possible attack that a malicious actor with sufficient
+privileges could conduct.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgb535fd5" class="outline-4">
+<h4 id="orgb535fd5"><span class="section-number-4">5.2.6</span> TempID Exposure Attack</h4>
+<div class="outline-text-4" id="text-5-2-6">
+<p>
+Consider devices A and B. Let the critical period be the time interval in
+between the <code>LAST_FETCH_TIME</code> and <code>NEXT_FETCH_TIME</code> values on A. Suppose A
+and B were in close proximity ("met") during the critical period. An
+attacker can determine that A and B met if:
+</p>
+
+<ol class="org-ol">
+<li>the attacker was able to read A's <code>tempIDs</code> file at any time during the
+critical period</li>
+<li>the attacker has access to B's contact tracing records covering the
+critical period</li>
+</ol>
+
+<p>
+Note that device B does not need to be a BlueTrace device, but could be a
+rogue device implementing the BlueTrace protocol but with direct access to
+received contact tracing records. In the case of a BlueTrace device, the
+attacker would have 21 days from <code>LAST_FETCH_TIME</code> to access the records,
+as collected contact tracing records will only be purged after 21
+days. <sup><a id="fnr.4" class="footref" href="#fn.4">4</a></sup>
+</p>
+
+<p>
+There are a few mitigating factors for this attack. First, being able to
+access the TempID store on A is not easy. It might require fully
+compromising A, in which case the attacker might also have access to more
+useful information, such as A's GPS coordinates. Second, accessing B's
+contact tracing records is not easy as well, if B is a BlueTrace device;
+it might also require compromising B.
+</p>
+
+<p>
+Here are some possible situations in which the attack might be useful:
+</p>
+
+<ul class="org-ul">
+<li>The attacker can carry out the attack, but does not have sufficient
+privileges to obtain any other location information from A nor B.</li>
+
+<li>The attacker is only able to carry out the attack after A and B met. At
+this point, the devices might not contain any location history that
+could be used to determine that A and B met, but the attack would be
+able to do so.</li>
+</ul>
+
+<p>
+The second scenario would include situations where the attacker could read
+the file on A during the critical period, but could only obtain contact
+tracing records from B some time later.
+</p>
+
+<p>
+Preventing this attack is difficult, as BlueTrace needs to maintain a
+local store of TempIDs to operate when offline. Only a design change to
+using asymmetric encryption would fully protect against it. To reduce the
+effectiveness of the attack, BlueTrace could try to reduce the number of
+TempIDs present in the system where possible. For example, it could remove
+all expired TempIDs from the <code>tempIDs</code> file (in
+<code>TempIDManager.retrieveTemporaryID()</code>), which would reduce the length of
+the critical period, and prevent an attacker from determining that A and B
+had met in the past.
+</p>
+
+<p>
+We also note that it might be possible to locate TempIDs within the
+device's memory, and there could also be side-channel attacks allowing
+another process to extract TempIDs, whether from memory, or from the BLE
+stack.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgb5e7568" class="outline-4">
+<h4 id="orgb5e7568"><span class="section-number-4">5.2.7</span> Use of location information</h4>
+<div class="outline-text-4" id="text-5-2-7">
+<p>
+As mentioned above, BlueTrace is designed to not keep track of a user's
+physical location. However, due to Android's permission model, it requires
+the <code>ACCESS_FINE_LOCATION</code> permission in order to make use of BLE; this
+permission also gives BlueTrace the ability to query a user's physical
+location, should it wish to. We thus need to verify that it does not
+do this.
+</p>
+
+<p>
+On Android, fine-grained location information can be obtained using
+LocationManager, by calling <code>LocationManager.getLastKnownLocation()</code>. We
+searched for all instances in the code where a call is made to
+<code>getLastKnownLocation()</code>. We found only one such call, in the <i>TwilightManager</i>
+class (<i>androidx.appcompat.app.TwilightManager</i>). This is a standard
+library and is not part of BlueTrace. As such, we conclude that BlueTrace
+does not use <code>getLastKnownLocation()</code> to access the device's location.
+</p>
+
+<p>
+We note that it is possible to determine a device's physical location
+through other means. However we have not found any code within BlueTrace
+that appears to do this.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org5fbe6a3" class="outline-4">
+<h4 id="org5fbe6a3"><span class="section-number-4">5.2.8</span> Analytics and Metadata</h4>
+<div class="outline-text-4" id="text-5-2-8">
+<p>
+BlueTrace contains two components that collect and send metadata to the
+remote server: Firebase Analytics and Metrics.
+</p>
+
+<p>
+Firebase Analytics is used to send additional analytics information to the
+server. This tends to be during erroneous conditions, and none of the
+messages appear to contain any personal information nor data related to
+contact tracing.
+</p>
+
+<p>
+As described in Section <a href="#orgbdaec54">2.2.2</a>, BlueTrace periodically collects contact
+tracing statistics and sends them back to the server. This happens either
+after new TempIDs are downloaded, or when a specific Firebase Cloud
+Message is received (see Section <a href="#org9bac042">5.2.10</a> below, and
+Section <a href="#orga65ccb9">7.7</a>). In either case, simple data about the system state,
+the number of contact tracing records collected over the previous day, and
+the timestamp of the latest record collected are sent to the server.
+</p>
+
+<p>
+The amount of metadata sent to the server is minimal, and unlikely to have
+a big impact on privacy. However, the collection counts could be used to
+infer some information about the user's location; a user with a higher
+collection count would be more likely to have been in a place with many
+people, or have been moving through different locations. In general, we do
+not consider this to be a significant breach of privacy.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org66bafa9" class="outline-4">
+<h4 id="org66bafa9"><span class="section-number-4">5.2.9</span> Analysis of Firebase sinks</h4>
+<div class="outline-text-4" id="text-5-2-9">
+<p>
+In addition to the above source analyses, we also inspected all places in
+BlueTrace where Firebase is used to send data to the cloud. We verified
+that sensitive personal data is never uploaded, except for two cases:
+</p>
+
+<ol class="org-ol">
+<li>During the registration phase, the user's mobile number and
+NRIC/passport number are uploaded.</li>
+<li>When an upload request is triggered by a health authority, after PIN
+verification, the user's contact tracing information is uploaded.</li>
+</ol>
+
+<p>
+Both of these cases are as expected.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org9bac042" class="outline-4">
+<h4 id="org9bac042"><span class="section-number-4">5.2.10</span> Remote command activation</h4>
+<div class="outline-text-4" id="text-5-2-10">
+<p>
+BlueTrace contains a feature that allows the server to remotely issue
+commands to client devices (see <a href="#orga65ccb9">7.7</a> for more details). The list of
+possible commands and what they do can be found in Section <a href="#org25ab4b9">7.2.7</a>; they consist of commands that start BlueTrace, start scanning
+or advertising, and so on. This is not of much concern, as those actions
+already happen regularly on the device.
+</p>
+</div>
+
+<div id="outline-container-org137a904" class="outline-5">
+<h5 id="org137a904"><span class="section-number-5">5.2.10.1</span> Remote Unpausing</h5>
+<div class="outline-text-5" id="text-5-2-10-1">
+<p>
+One particular command we were concerned about was the <code>ACTION_USER_PAUSE</code>
+command. This command is used not only to pause BlueTrace, but also to
+<i>unpause</i> it (see Section <a href="#org25ab4b9">7.2.7</a>, <code>ACTION_USER_PAUSE</code>). If a
+user has paused BlueTrace because they do not want their contact tracing
+information to be collected, it would be unacceptable that the server
+could then unpause BlueTrace and resume collection.
+</p>
+
+<p>
+Fortunately, it is not possible for the server to unpause BlueTrace,
+because to do so, an argument must be supplied along with the
+command. FCMService does not provide a way for the remote server to
+specify command arguments.
+</p>
+
+<p>
+We note however, that this appears to be circumstantial, and not by
+design; a future update to BlueTrace which allows remote commands to set
+arguments would then inadvertently enable remote unpausing. We recommend
+that FCMService make an explicit check on the command index specified by
+the remote server, and ignore it if it is <code>ACTION_USER_PAUSE</code>. This would
+give users more certainty that BlueTrace will always honour the pause
+setting. We discuss the pause feature further in Section <a href="#orgd17ea62">5.2.12</a> (Pausing).
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org77792e0" class="outline-4">
+<h4 id="org77792e0"><span class="section-number-4">5.2.11</span> Threat scenarios</h4>
+<div class="outline-text-4" id="text-5-2-11">
+<p>
+We now consider a few specific threat scenarios specific to privacy
+concerns. We will refer to the BlueTrace users whose privacy we wish to
+preserve as Alice and Bob. The goal of the attackers is to obtain private
+information about Alice and Bob: their personal identification
+information, and whether or not Alice and Bob have been in close proximity
+with each other.
+</p>
+</div>
+
+<div id="outline-container-org3ef87b2" class="outline-5">
+<h5 id="org3ef87b2"><span class="section-number-5">5.2.11.1</span> Proximate Malicious User</h5>
+<div class="outline-text-5" id="text-5-2-11-1">
+<p>
+Consider a malicious user Carol, with one or more rogue devices that
+implement the BlueTrace protocol while providing full access to all data
+received. Carol's devices can be in close proximity to Alice's or Bob's.
+</p>
+
+<p>
+Carol would be able to see the contact tracing records sent by
+both. However since the TempIDs cannot be linked to any permanent
+identity, accessing those records would not pose a privacy risk. The
+TempIDs also do not reveal whether or not Alice and Bob have met.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org096e597" class="outline-5">
+<h5 id="org096e597"><span class="section-number-5">5.2.11.2</span> Compromised Client</h5>
+<div class="outline-text-5" id="text-5-2-11-2">
+<p>
+Now consider an attacker Dan, who is able to compromise Alice's device in
+a way that gives him privileged access to BlueTrace. Dan does not need to
+be physically proximate to Alice or Bob.
+</p>
+
+<p>
+Dan would then have access to:
+</p>
+
+<ul class="org-ul">
+<li>Alice's TTID, a permanent identifier. But this identifier cannot be used
+to determine any personal information.</li>
+<li>Alice's contact tracing log. But without the TempID secret key, he
+cannot determine who the contacts in the log are.</li>
+<li>Alice's <code>ENCRYPTED_USER_DATA</code> and <code>ENCRYPTED_PHONE_NUMBER</code>
+values. Depending on his privilege level and the security of the Android
+Keystore setup, he may or may not be able to decrypt the values to
+obtain personal identification information.</li>
+</ul>
+
+<p>
+Dan would also have access to Alice's <code>tempIDs</code> file. If he is able to
+compromise Bob's device as well, he would be able to conduct the attack
+described in <a href="#orgb535fd5">5.2.6</a>.
+</p>
+
+<p>
+One possible scenario is where Dan captures Alice and Bob at some point
+shortly after they have met, and compromises both their phones in order to
+prove that they have met.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org081d8ce" class="outline-5">
+<h5 id="org081d8ce"><span class="section-number-5">5.2.11.3</span> Firebase Eavesdropper</h5>
+<div class="outline-text-5" id="text-5-2-11-3">
+<p>
+Next, consider an attacker Eve, who is able to eavesdrop on the traffic
+that travels between BlueTrace and Firebase.
+</p>
+
+<p>
+Eve would be able to see Alice and Bob's personal identification
+information, if they registered after Eve began eavesdropping. Eve
+would also be able to determine Alice and Bob's TTIDs, and see all their
+TempIDs.
+</p>
+
+<p>
+However, she would need some other mechanism to obtain their contact
+tracing records in order to know if they have met. Besides compromising
+their devices, she could plant rogue BlueTrace devices in areas where
+Alice and Bob might meet; if the rogue device detects TempIDs that belong
+to both Alice and Bob, she would then know they were in the same
+location.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org19f3bf1" class="outline-5">
+<h5 id="org19f3bf1"><span class="section-number-5">5.2.11.4</span> Compromised Server</h5>
+<div class="outline-text-5" id="text-5-2-11-4">
+<p>
+Consider an attacker Frank, that is able to compromise the server
+backend used by BlueTrace.
+</p>
+
+<p>
+Frank would have access to important BlueTrace credentials. He would be
+able to look up the personal identification information of any BlueTrace
+user. He would also have access to the TempID secret key, allowing him to
+decrypt the TempIDs in any contact tracing record he has access to.
+</p>
+
+<p>
+However, just like Eve, Frank does not have access to Alice and Bob's
+contact tracing records, and would need some other mechanism to obtain
+them.
+</p>
+
+<p>
+Frank would possess the PIN needed to make Alice or Bob's devices upload
+contact tracing records to the server (which Frank controls). If Frank
+could coerce or deceive Alice or Bob into performing an upload, he would
+then be able to access their contact tracing records.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org4e5fbaa" class="outline-5">
+<h5 id="org4e5fbaa"><span class="section-number-5">5.2.11.5</span> Government Surveillance</h5>
+<div class="outline-text-5" id="text-5-2-11-5">
+<p>
+Finally, consider a government-sponsored attacker Grace. Grace is able to
+access the same set of credentials as Frank, and thus have the same level
+of access, but with the same limitations. Grace might, however, be more
+capable of conducting the rogue device attack at a large scale, or to
+coerce Alice or Bob to reveal their contact tracing records.
+</p>
+
+<p>
+We should note here, however, that Grace would also have access to many
+other mechanisms that could allow her to achieve similar levels of
+surveillance. For example, Grace might be able to make use of information
+from telecommunication providers to determine Alice and Bob's physical
+location. Grace might also be able to use camera footage or similar
+infrastructure to locate them.
+</p>
+
+<p>
+In particular, Singapore already has surveillance infrastructure that
+would provide at least as much surveillance as what could be achieved by
+abusing BlueTrace, without needing to deploy a vast array of rogue
+BlueTrace devices. As such, we believe that using BlueTrace does not
+greatly increase an individual's risk of being surveilled by the
+government <sup><a id="fnr.5" class="footref" href="#fn.5">5</a></sup>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgabfb54a" class="outline-5">
+<h5 id="orgabfb54a"><span class="section-number-5">5.2.11.6</span> Discussion</h5>
+<div class="outline-text-5" id="text-5-2-11-6">
+<p>
+As can be seen from the above scenarios, the partial decentralization
+strategy in BlueTrace is effective: in general, an attacker would need
+both information from the server, and from the client, in order to obtain
+personal information.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgd17ea62" class="outline-4">
+<h4 id="orgd17ea62"><span class="section-number-4">5.2.12</span> Other privacy features</h4>
+<div class="outline-text-4" id="text-5-2-12">
+<p>
+We go through a few other privacy-centric features of BlueTrace, and
+whether they are implemented correctly.
+</p>
+</div>
+
+<div id="outline-container-org2f05401" class="outline-5">
+<h5 id="org2f05401"><span class="section-number-5">5.2.12.1</span> Data purging</h5>
+<div class="outline-text-5" id="text-5-2-12-1">
+<p>
+BlueTrace removes contact tracing records that are older than 21 days, as
+older records are not useful for contact tracing. We verified that the
+BlueTrace code does correctly remove old records. For more details, see
+the Sections <a href="#org25ab4b9">7.2.7</a> (<code>ACTION_PURGE</code>) and
+<a href="#org0b44d61">7.4.5</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org148daf0" class="outline-5">
+<h5 id="org148daf0"><span class="section-number-5">5.2.12.2</span> Pausing</h5>
+<div class="outline-text-5" id="text-5-2-12-2">
+<p>
+Another privacy-related feature is pausing. A user can pause BlueTrace for
+a set amount of time through the user interface. We verified that
+BlueTrace correctly suspends scanning and advertising services during the
+period where it is paused, except for any scanning and advertising that
+might be in progress at the point of pausing. No contact tracing records
+are sent or received while paused. See Section <a href="#orga8a6cf9">7.2.10</a> for a full analysis.
+</p>
+
+<p>
+As mentioned in the Section <a href="#org9bac042">5.2.10</a>, in the version
+of BlueTrace we analyzed, it is not possible for the remote server to
+unpause BlueTrace.
+</p>
+
+<p>
+While we have verified that pausing works as expected, we would still
+recommend BlueTrace users to additionally disable Bluetooth on their
+devices during periods at which they would not want contact tracing to
+take place.
+</p>
+</div>
+</div>
+</div>
+</div>
+
+
+<div id="outline-container-org2b1c464" class="outline-3">
+<h3 id="org2b1c464"><span class="section-number-3">5.3</span> Security</h3>
+<div class="outline-text-3" id="text-5-3">
+<p>
+BlueTrace is an app constantly sending and receiving data from other
+untrusted devices. As such, the security of BlueTrace is of great concern,
+as a security flaw could mean that a large number of devices could be
+quickly compromised in a short period of time.
+</p>
+</div>
+
+<div id="outline-container-org933a336" class="outline-4">
+<h4 id="org933a336"><span class="section-number-4">5.3.1</span> Threat Model</h4>
+<div class="outline-text-4" id="text-5-3-1">
+<p>
+We assume an attacker that is able to place one or more devices in close
+proximity to a target device, and be able to send and receive BlueTrace
+contact tracing records to and from the target. The goal of the attacker
+is to either cause a denial of service to the target device, or achieve
+remote code execution on the target device.
+</p>
+
+<p>
+Note that in this report we do not investigate attacks that compromise the
+integrity of the contact tracing process, for example by creating fake
+contact tracing records, as we are primarily concerned with the risks to
+the end user.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org13f12a2" class="outline-4">
+<h4 id="org13f12a2"><span class="section-number-4">5.3.2</span> Attack Surface</h4>
+<div class="outline-text-4" id="text-5-3-2">
+<p>
+Given our threat model, the attack surface consists of BLE layer messages
+sent from the attacker device to BlueTrace. This happens in the following
+situations:
+</p>
+
+<ul class="org-ul">
+<li>When the target scans for devices and processes the attacker's
+advertisement</li>
+<li>When the target (as a Central device) connects to the attacker and
+retrieves an Encounter Message (reading a characteristic)</li>
+<li>When the target (as a Peripheral device) is connected to by the attacker
+and is sent an Encounter Message (writing a characteristic)</li>
+</ul>
+
+<p>
+Our analysis only focuses on potential vulnerabilities in BlueTrace; as
+such, we do not consider vulnerabilities in lower layer code such as
+Android's implementation of BLE, or the Bluetooth firmware or hardware.
+</p>
+
+<p>
+We now go through each potential attack vector in detail to verify whether or
+not it can be used to compromise the target.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org449764e" class="outline-4">
+<h4 id="org449764e"><span class="section-number-4">5.3.3</span> Advertisements</h4>
+<div class="outline-text-4" id="text-5-3-3">
+<p>
+StreetPassScanner is the BlueTrace component that manages scanning of
+devices. It registers a <i>BleScanCallback</i> object to handle advertisements
+from remote devices: <code>BleScanCallback.onScanResult()</code> will process each
+scan result.
+</p>
+
+<p>
+Most of the advertisement data sent by the remote device are parsed in
+lower layer code. <code>onScanResult()</code> only reads two untrusted values: an
+integer representing the transmission power, and an array of bytes known
+as the manufacturer-specific data. The values are stored in an object and
+then passed on for further processing. Based on our analysis, none of
+these values are used in situations that could lead to compromise; in fact
+the manufacturer-specific data is never accessed.
+</p>
+
+<p>
+Please refer to Section <a href="#orgbdd8ff1">7.4.1</a> for more details.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orged63e87" class="outline-4">
+<h4 id="orged63e87"><span class="section-number-4">5.3.4</span> Central Characteristic Read</h4>
+<div class="outline-text-4" id="text-5-3-4">
+<p>
+StreetPassWorker manages the exchange of contact tracing records when a
+device acts as a Central device, and <i>CentralGattCallback</i> is the callback
+class that handles the data sent by remote devices. When a remote
+BlueTrace device is detected via scanning, StreetPassWorker will connect
+to it, and read the value of a specific characteristic. The value returned
+by this operation is an untrusted byte array.
+</p>
+
+<p>
+<i>CentralGattCallback</i> will eventually decode the value byte array into a
+UTF-8 string, and then deserialize it as a JSON string (using the Gson
+library), into a <i>V2ReadRequestPayload</i> object. Please see Sections
+<a href="#org3420dac">7.4.2</a> (CentralGattCallback) and <a href="#orge817835">7.5</a> for more
+details.
+</p>
+
+<p>
+The values from the deserialized V2ReadRequestPayload object are used to
+initialize a <i>ConnectionRecord</i> object, which is then attached to an
+<code>ACTION_RECEIVED_STREETPASS</code> intent and locally broadcasted.
+</p>
+
+<p>
+StreetPassReceiver receives the intent, extracts the <i>ConnectionRecord</i>, and
+uses the values within to create a new <i>StreetPassRecord</i>, which is finally
+saved to the database.
+</p>
+
+<p>
+From this point, the values within the database are generally not
+accessed, except when uploaded to the server for contact tracing. See
+Section <a href="#org0b44d61">7.4.5</a> (Data Access Analysis) for more details.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org4ea2f3b" class="outline-4">
+<h4 id="org4ea2f3b"><span class="section-number-4">5.3.5</span> Peripheral Characteristic Write</h4>
+<div class="outline-text-4" id="text-5-3-5">
+<p>
+StreetPassServer manages the exchange of contact tracing records when a
+device acts as a Peripheral device, and the <code>gattServerCallback</code> object
+created as part of <i>GattServer</i> handles data sent by remote devices. When a
+remote BlueTrace device sends a request to write to a characteristic,
+the function <code>onCharacteristicWriteRequest()</code> will be called, with
+untrusted values.
+</p>
+
+<p>
+Once the value is received fully as an array of bytes, it will be passed
+to the <code>saveDataReceived()</code> function, which will ultimately decode the
+byte array into a UTF-8 string, and then deserialize it as a JSON string
+(using the Gson library), into a <i>V2WriteRequestPayload</i> object. Note that
+this is symmetric to the processing happening in the Central Read data
+flow. Please see Sections <a href="#org874acb1">7.4.4</a> (GattServer Callbacks) and
+<a href="#orge817835">7.5</a> for more details.
+</p>
+
+<p>
+As in the Central Read case, the values from the deserialized
+<i>V2WriteRequestPayload</i> object are used to initialize a <i>ConnectionRecord</i>
+object, and then broadcasted with an <code>ACTION_RECEIVED_STREETPASS</code> intent.
+</p>
+
+<p>
+StreetPassReceiver receives the intent, and proceeds identically to the
+Central case, eventually writing the data to the database, which from that
+point on will generally not be accessed.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgc04c86e" class="outline-4">
+<h4 id="orgc04c86e"><span class="section-number-4">5.3.6</span> Deserialization</h4>
+<div class="outline-text-4" id="text-5-3-6">
+<p>
+Deserialization is often a source of vulnerabilities in Java code. We took
+a close look at the use of deserialization in BlueTrace to verify there
+are no bugs in how it is being used.
+</p>
+
+<p>
+The Gson library is used to deserialize an untrusted byte array into an
+object in both the Central Read and Peripheral Write cases. As the
+deserialization call to <code>Gson.fromJson()</code> explicitly provides the type of
+the target object, it is not possible to cause the JSON string to be
+deserialized into an arbitrary Java object. The target objects
+(<i>V2ReadRequestPayload</i>, <i>V2WriteRequestPayload</i>) are simple and consist of a
+few string and integer fields. As such we did not find anything of concern
+in the deserialization code.
+</p>
+
+<p>
+Nevertheless, we feel it might not be ideal to feed untrusted data from
+arbitrary Bluetooth devices into a complex parser, as is required with
+JSON deserialization. Any exploitable vulnerabilities in Gson would then
+become exploitable in BlueTrace. Given the simplicity of the data being
+sent between devices, it might be better to use a simpler format, e.g. a
+sequence of fixed-width values.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org4b8b076" class="outline-4">
+<h4 id="org4b8b076"><span class="section-number-4">5.3.7</span> SQL Attacks</h4>
+<div class="outline-text-4" id="text-5-3-7">
+<p>
+As untrusted data ultimately gets written into the database, we also
+investigated if there were any issues with the SQL commands used to insert
+data. Fortunately, all SQL queries are properly parameterized, and thus it
+should not be possible to conduct an SQL injection attack or similar.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org398f8c1" class="outline-4">
+<h4 id="org398f8c1"><span class="section-number-4">5.3.8</span> Minor Bugs</h4>
+<div class="outline-text-4" id="text-5-3-8">
+<p>
+We discovered a few minor bugs in BlueTrace, that do not have any impact
+on security. We summarize them here:
+</p>
+
+<ol class="org-ol">
+<li>In StreetPassWorker, when a new Work object is used to replace an older
+one, an associated timeout handler is not replaced.</li>
+<li>In StreetPassServer, when handling long writes, data is not written to
+the provided offset value but always appended to previously collected
+data.</li>
+<li>In StreetPassServer, when handling long writes, a request to cancel a
+write is ignored.</li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-org3185586" class="outline-4">
+<h4 id="org3185586"><span class="section-number-4">5.3.9</span> Discussion</h4>
+<div class="outline-text-4" id="text-5-3-9">
+<p>
+As can be seen in the above analysis, we did not find any vulnerabilities
+in how untrusted data is processed within BlueTrace. This does not rule
+out the existence of any vulnerabilities, in particular in components we
+did not look at, such as lower-layer components like Gson, SQLite or the
+BLE stack. However, we conclude that users can have a level of assurance
+that BlueTrace is written securely.
+</p>
+</div>
+</div>
+</div>
+</div>
+
+
+<div id="outline-container-org8026026" class="outline-2">
+<h2 id="org8026026"><span class="section-number-2">6</span> Conclusion and Future Work</h2>
+<div class="outline-text-2" id="text-6">
+<p>
+Based on our investigation, we conclude that:
+</p>
+
+<ol class="org-ol">
+<li>BlueTrace is generally respectful of a user's privacy, with only one
+minor privacy issue relating to TempID storage.</li>
+<li>BlueTrace does not appear to have any significant security flaws, and
+only a few minor bugs.</li>
+</ol>
+
+<p>
+As our investigation only consists of a static analysis of BlueTrace's
+backend implementation, there is more research that can be done. We list a
+few possibilities here:
+</p>
+
+<ul class="org-ul">
+<li>The uploading component that sends contact tracing
+records to the central server</li>
+<li>SafeEntry, in the new 2.1.4 version</li>
+<li>UI components</li>
+<li>Dynamic analysis, including fuzzing of the BLE components</li>
+<li>Analysis of Firebase communications: enumeration of APIs accessible by a
+user and if any of these APIs leak information</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-orgb1f5fc8" class="outline-2">
+<h2 id="orgb1f5fc8"><span class="section-number-2">7</span> Detailed Investigation</h2>
+<div class="outline-text-2" id="text-7">
+<p>
+In this section, we go through each component of BlueTrace in detail. Note
+that all information presented here is based on the reverse engineering of
+the BlueTrace Android application, and not on the OpenTrace source code.
+</p>
+</div>
+
+<div id="outline-container-orgecb9f7a" class="outline-3">
+<h3 id="orgecb9f7a"><span class="section-number-3">7.1</span> Overview</h3>
+<div class="outline-text-3" id="text-7-1">
+</div>
+<div id="outline-container-org7d2119a" class="outline-4">
+<h4 id="org7d2119a"><span class="section-number-4">7.1.1</span> Main Components</h4>
+<div class="outline-text-4" id="text-7-1-1">
+<p>
+BlueTrace's backend implementation can be divided into six major components:
+</p>
+
+<ul class="org-ul">
+<li>BluetoothMonitoringService (<i>services.BluetoothMonitoringService</i>), the
+top-level service that is launched during startup, and coordinates all
+other services.</li>
+
+<li><b>TempIDManager</b> (<i>idmanager.TempIDManager</i>), downloads TempIDs from the
+server, stores them on disk, and provides the currently valid TempID to
+other components.</li>
+
+<li><b>StreetPass</b> (<i>streetpass.*</i>), services that manage the dissemination and
+storage of contact tracing records: scanning, exchanging of records, and
+storing on disk.</li>
+
+<li><b>BlueTraceProtocol</b> (<i>protocol.*</i>), implements the over-the-air message
+format used by BlueTrace, and is used by StreetPass.</li>
+</ul>
+
+<p>
+In addition, there are also a few minor components worth investigating:
+</p>
+
+<ul class="org-ul">
+<li><b>Metrics</b> (<i>metrics.*</i>), a service that collects and uploads app metrics</li>
+
+<li><b>FCMService</b> (<i>services.FCMService</i>) is a service that receives remote
+messages sent via Firebase Cloud Messaging (FCM).</li>
+
+<li><b>User Registration</b> (<i>onboarding.newOnboard.register.*</i>) contains the
+logic that registers a new user with the BlueTrace server components,
+including personal information.</li>
+
+<li><b>Debug Actions</b> (<i>PeekActivity</i> and <i>PlotActivity</i>), special UI views for
+debugging purposes that are not normally accessible.</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org2378466" class="outline-4">
+<h4 id="org2378466"><span class="section-number-4">7.1.2</span> Event Model</h4>
+<div class="outline-text-4" id="text-7-1-2">
+<p>
+Android apps are event-driven: apps handle intents sent from within the
+app or from external services. BlueTrace processes 4 different kinds of
+events:
+</p>
+
+<ol class="org-ol">
+<li>Global intents</li>
+<li>Local intents sent via <i>LocalBroadcastManager</i></li>
+<li><i>CommandHandler</i> messages, internal to BluetoothMonitoringService</li>
+<li>Firebase Cloud Messaging remote messages</li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-orgcc7d870" class="outline-4">
+<h4 id="orgcc7d870"><span class="section-number-4">7.1.3</span> Data Model</h4>
+<div class="outline-text-4" id="text-7-1-3">
+<p>
+BlueTrace processes contact tracing records. These records are a log of
+encounters between two BlueTrace devices, where a Central device which
+connects to a Peripheral device. Both devices generate a record
+containing the TempID of the other device, as well as other required
+information.
+</p>
+
+<p>
+As described in the white paper, Encounter Messages are transmitted
+between devices using BLE. These Encounter Messages are the lowest level
+form of contact tracing records, and are UTF-8 encoded JSON strings. The
+strings can be deserialized into JSON objects containing these values:
+</p>
+
+<ul class="org-ul">
+<li>protocol version</li>
+<li>organization code</li>
+<li>TempID of sending device</li>
+<li>device model of sending device</li>
+<li>received signal strength indicator (RSSI), when sent by a Central
+device.</li>
+</ul>
+
+<p>
+After an Encounter Message is received, BlueTrace converts it into a
+ConnectionRecord, which is the same for both Central and Peripheral
+devices. The ConnectionRecord contains:
+</p>
+
+<ul class="org-ul">
+<li>protocol version</li>
+<li>organization code</li>
+<li>TempID of other device</li>
+<li>Bluetooth address and device model of Peripheral device</li>
+<li>Bluetooth address and device model of Central device</li>
+<li>RSSI</li>
+<li>transmission power: measured power as reported by a Peripheral device
+during BLE advertising, this is null if this device was the Peripheral .</li>
+</ul>
+
+<p>
+The information in the ConnectionRecord is eventually converted into a
+StreetPassRecord that can be written into the database. StreetPassRecords
+contain the following fields:
+</p>
+
+<ul class="org-ul">
+<li>protocol version</li>
+<li>organization code</li>
+<li>TempID of other device</li>
+<li>device model of Peripheral device</li>
+<li>device model of Central device</li>
+<li>RSSI</li>
+<li>transmission power (might be null)</li>
+<li>timestamp, set to the time at which the StreetPassRecord was created.</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org8565b1b" class="outline-4">
+<h4 id="org8565b1b"><span class="section-number-4">7.1.4</span> Build Configuration</h4>
+<div class="outline-text-4" id="text-7-1-4">
+<p>
+As we reverse engineered the compiled version of BlueTrace, configuration
+variables set when the app was built appear as literal values. As such, in
+this report, we will report those values as they appear, even if there is
+evidence those values originated from a build configuration. For example,
+<code>BuildConfig.APPLICATION_ID</code> will be reported as "sg.gov.tech.bluetrace".
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgc21c3aa" class="outline-3">
+<h3 id="orgc21c3aa"><span class="section-number-3">7.2</span> BluetoothMonitoringService</h3>
+<div class="outline-text-3" id="text-7-2">
+<p>
+BluetoothMonitoringService is the top-level service in BlueTrace. The
+implementation can be found in the class
+<i>services.BluetoothMonitoringService</i>. For brevity we will abbreviate
+BluetoothMonitoringService as BMS for the remainder of this report, and
+abbreviate the <i>services.BluetoothMonitoringService</i> namespace as <i>BMS</i> in
+class and function names. In this section, all non-qualified names are
+methods or properties of BMS.
+</p>
+
+<p>
+BMS is started when a service intent is sent to it via
+<code>Context.startService()</code> (i.e. typical Android service behaviour). This
+will trigger <code>onCreate()</code> to perform initialization if BMS is not already
+running, and then <code>onStartCommand()</code> with the associated intent.
+</p>
+</div>
+
+<div id="outline-container-org9af2b9f" class="outline-4">
+<h4 id="org9af2b9f"><span class="section-number-4">7.2.1</span> SwiftMED</h4>
+<div class="outline-text-4" id="text-7-2-1">
+<p>
+BlueTrace makes reference to a separate app called SwiftMED
+(<i>com.swiftoffice.swiftmed</i>). This appears to be a version of BlueTrace
+customized for use by the Singapore Armed Forces. BMS detects the presence
+of SwiftMED and disables BlueTrace while it is installed.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org3c266f5" class="outline-4">
+<h4 id="org3c266f5"><span class="section-number-4">7.2.2</span> Initialization</h4>
+<div class="outline-text-4" id="text-7-2-2">
+<p>
+When a new BMS instance is created, <code>onCreate()</code> is called. This function
+calls the <code>setup()</code> function to do the following:
+</p>
+
+<ul class="org-ul">
+<li>Initialize <i>CommandHandler</i>, for handling commands internally.</li>
+<li>Initialize StreetPassWorker, which will register a few intent receivers.</li>
+<li>Register receivers for local intents via <i>LocalBroadcastManager</i>:
+<ul class="org-ul">
+<li><i>StreetPassReceiver</i> for <code>ACTION_RECEIVED_STREETPASS</code></li>
+<li><i>StatusReceiver</i> for <code>ACTION_RECEIVED_STATUS</code></li>
+</ul></li>
+<li>Register receivers for global intents:
+<ul class="org-ul">
+<li><i>BluetoothStatusReceiver</i> for <code>android.bluetooth.adapter.action.STATE_CHANGED</code></li>
+<li><i>SwiftmedInstalledReceiver</i> for <code>android.intent.action.PACKAGE_ADDED</code></li>
+<li><i>SwiftmedRemovedReceiver</i> for <code>android.intent.action.PACKAGE_FULLY_REMOVED</code></li>
+</ul></li>
+<li>Register listener for preference changes; this just updates
+notifications when there is a change in language, via the
+<code>PREFERRED_LANGUAGE</code> preference.</li>
+<li>Initialize databases:
+<ul class="org-ul">
+<li>Creates a new <i>StreetPassRecordStorage</i> object</li>
+<li>Creates a new <i>StatusRecordStorage</i> object</li>
+</ul></li>
+<li>Creates a new Volley request queue; this does not seem to actually be used.</li>
+<li>Set up the notification manager and channel</li>
+<li>Get an instance of the <i>FirebaseFunctions</i> object for region "asia-east2"</li>
+<li>Retrieve and store the current valid TempID into <code>broadcastMessage</code>,
+using <code>TempIDManager.retrieveTemporaryID()</code>.</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org0237c39" class="outline-4">
+<h4 id="org0237c39"><span class="section-number-4">7.2.3</span> Event Handling</h4>
+<div class="outline-text-4" id="text-7-2-3">
+<p>
+BMS's main event handler is a function called <code>runService()</code>, which
+handles <i>Command</i> objects. The top-level event handlers for intents and
+messages eventually create <i>Commands</i> which are passed in to
+<code>runService()</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org9794908" class="outline-4">
+<h4 id="org9794908"><span class="section-number-4">7.2.4</span> Command Objects</h4>
+<div class="outline-text-4" id="text-7-2-4">
+<p>
+<i>Command</i> is an enumeration class, representing possible actions that can be
+performed by BMS. In general, <i>Commands</i> derive from intents; the enum index
+representing a <i>Command</i> is extracted from an intent's extra data using the
+key <code>COMMAND_KEY</code> (<code>sg.gov.tech.bluetrace_CMD</code>). <i>Commands</i> may also have an
+associated argument, which can be extracted from the associated intent's
+extra data using the key <code>COMMAND_ARGS</code> (<code>sg.gov.tech.bluetrace_ARG</code>).
+</p>
+
+<p>
+These are the known <i>Command</i> indices in BlueTrace version 2.0.15:
+</p>
+
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-right">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left"><b>Command</b></th>
+<th scope="col" class="org-right"><b>Index</b></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left"><code>INVALID</code></td>
+<td class="org-right">-1</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>ACTION_START</code></td>
+<td class="org-right">1</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>ACTION_SCAN</code></td>
+<td class="org-right">2</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>ACTION_STOP</code></td>
+<td class="org-right">3</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>ACTION_ADVERTISE</code></td>
+<td class="org-right">4</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>ACTION_SELF_CHECK</code></td>
+<td class="org-right">5</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>ACTION_UPDATE_BM</code></td>
+<td class="org-right">6</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>ACTION_PAUSE_FOR_SWIFTMED</code></td>
+<td class="org-right">7</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>ACTION_PURGE</code></td>
+<td class="org-right">8</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>ACTION_USER_PAUSE</code></td>
+<td class="org-right">9</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<div id="outline-container-org22a9cd7" class="outline-4">
+<h4 id="org22a9cd7"><span class="section-number-4">7.2.5</span> Intent Handling</h4>
+<div class="outline-text-4" id="text-7-2-5">
+<p>
+Intents sent to BMS are handled via <code>onStartCommand()</code>. This function
+extracts a BMS <i>Command</i> from the intent's extra data as described in
+<a href="#org9794908">7.2.4</a>. If no intent is supplied (possible when
+<code>onStartCommand()</code> is called to restart the service due to the
+<code>START_STICKY</code> flag, see documentation of <code>Service.onStartCommand</code>), or if
+the intent does not contain a <i>Command</i> index, then the <i>Command</i> is set to
+<code>ACTION_INVALID</code>.
+</p>
+
+<p>
+<code>onStartCommand()</code> then checks to see if BlueTrace is supposed to be
+paused, by checking the value of the preference <code>PAUSE_TS</code>; if the current
+time is before the time represented by <code>PAUSE_TS</code>, then BlueTrace should
+be paused.
+</p>
+
+<p>
+If BlueTrace is to be paused, <code>onStartCommand()</code> will return immediately,
+<i>except if the Command associated with the intent is
+<code>ACTION_USER_PAUSE</code></i>. For more details on pausing, please see Section
+<a href="#orga8a6cf9">7.2.10</a>.
+</p>
+
+<p>
+Otherwise, <code>onStartCommand()</code> will then verify that the <code>ACCESS_FINE_LOCATION</code>
+permission is available, and Bluetooth is enabled. Again, it skips this
+verification step if the <i>Command</i> is <code>ACTION_USER_PAUSE</code>.
+</p>
+
+<p>
+Finally, if the intent is not null, <code>runService()</code> will be called with the
+<i>Command</i> and intent, in order to process the <i>Command</i>. Otherwise, an
+<code>ACTION_START</code> command will be queued for processing using CommandHandler.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org28ecf1f" class="outline-4">
+<h4 id="org28ecf1f"><span class="section-number-4">7.2.6</span> Command Handler</h4>
+<div class="outline-text-4" id="text-7-2-6">
+<p>
+<i>CommandHandler</i> (<i>services.CommandHandler</i>) is a subclass of <i>Handler</i>,
+and implements a separate message queue for <i>Commands</i>, internal to
+BMS. BMS uses it to schedule <i>Commands</i> for processing, without needing to
+create associated intents, and also to query the current status of
+scheduled <i>Commands</i>.
+</p>
+
+<p>
+Messages are sent using <code>Handler.sendMessage()</code> or
+<code>Handler.sendMessageDelayed()</code>, with an associated Command's index as the
+<code>what</code> argument to the message. CommandHandler eventually handles the
+messages using <code>handleMessage</code>, and processes the associated <i>Command</i> by
+calling <code>runService()</code> with the <i>Command</i> and a null intent.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org25ab4b9" class="outline-4">
+<h4 id="org25ab4b9"><span class="section-number-4">7.2.7</span> Command Processing</h4>
+<div class="outline-text-4" id="text-7-2-7">
+<p>
+Actual processing of commands takes place in the <code>runService()</code> function.
+</p>
+
+<p>
+Before processing the <i>Command</i>, <code>runService()</code> performs the same checks as
+in <code>onStartCommand()</code>: it checks if BlueTrace is not supposed to be
+paused, if location permissions are available, and if Bluetooth is
+enabled. If not, unless the command is <code>ACTION_USER_PAUSE</code>, <code>runService()</code>
+will return immediately.
+</p>
+
+<p>
+Otherwise, the <i>Command</i> will be processed as per below.
+</p>
+</div>
+
+<div id="outline-container-org7f9d4a3" class="outline-5">
+<h5 id="org7f9d4a3"><span class="section-number-5">7.2.7.1</span> ACTION_START</h5>
+<div class="outline-text-5" id="text-7-2-7-1">
+<p>
+<code>runService()</code> calls <code>setupService()</code>, which creates the following
+objects:
+</p>
+
+<ul class="org-ul">
+<li><i>StreetPassServer</i> with UUID of <code>serviceUUID</code> (B82AB3FC-1595-4F6A-80F0-FE094CC218F9)</li>
+<li><i>StreetPassScanner</i> with UUID of <code>serviceUUID</code> and scan duration of
+<code>scanDuration</code> (8s)</li>
+<li><i>BLEAdvertiser</i> with UUID of <code>serviceUUID</code></li>
+</ul>
+
+<p>
+These classes are described in their corresponding sections.
+</p>
+
+<p>
+Next, events are scheduled using <i>AlarmManager</i> to send a service intent to
+BMS with specific <i>Commands</i>:
+</p>
+
+<ul class="org-ul">
+<li><code>ACTION_SELF_CHECK</code> at <code>healthCheckInterval</code> (900s), will auto-repeat</li>
+<li><code>ACTION_PURGE</code> every <code>purgeInterval</code> (24h) since the last purge (as
+stored in the preference <code>LAST_PURGE_TIME</code>, scheduled using
+<code>AlarmManager.setRepeating()</code> <sup><a id="fnr.6" class="footref" href="#fn.6">6</a></sup>.</li>
+<li><code>ACTION_UPDATE_BM</code> at <code>bmCheckInterval</code> (540s), will auto-repeat</li>
+</ul>
+
+<p>
+Finally, <code>actionStart()</code> is called, which requests for TempIDManager to
+download new TempIDs from the server via
+<code>TempIDManager.getTemporaryIDs()</code>. This is an asynchronous Task that makes
+a Firebase call. When the call completes, the current valid TempID is
+retrieved using <code>TempIDManager.retrieveTemporaryID</code> and used to set
+<code>broadcastMessage</code>. Then, <code>setupScanCycles()</code> and
+<code>setupAdvertisingCycles()</code> are called, which use <i>CommandHandler</i> to send
+<code>ACTION_SCAN</code> and <code>ACTION_ADVERTISE</code> <i>Commands</i> for processing.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org0475e9a" class="outline-5">
+<h5 id="org0475e9a"><span class="section-number-5">7.2.7.2</span> ACTION_SCAN</h5>
+<div class="outline-text-5" id="text-7-2-7-2">
+<p>
+The next scan is first scheduled via <i>CommandHandler</i>: an ACTION_SCAN
+<i>Command</i> is scheduled to be processed after a delay. The delay is
+calculated by adding a random value between <code>minScanInterval</code> (36s) and
+<code>maxScanInterval</code> (43s) to <code>scanDuration</code> (8s).
+</p>
+
+<p>
+<code>runService()</code> then checks to see if the SwiftMED app is installed, and
+does nothing if so. Otherwise, it calls <code>actionScan()</code>.
+</p>
+
+<p>
+<code>actionScan()</code> first checks if no existing TempID is set (in
+<code>broadcastMessage</code>), or if a new batch of TempIDs should be downloaded. If
+not, <code>performScan()</code> is called, which we detail below. Otherwise,
+<code>TempIDManager.getTemporaryIDs()</code> is called asynchronously download new
+TempIDs. When the download is completed, a new TempID is retrieved, and
+used to set <code>broadcastMessage</code>. <code>performScan()</code> is then called.
+</p>
+
+<p>
+<code>performScan()</code> sets up a new <i>StreetPassScanner</i> if required, and then
+starts a scan by calling <code>StreetPassScanner.startScan()</code>, unless
+<i>StreetPassScanner</i> reports that a scan is already running.
+</p>
+
+<p>
+The actual scan and actions relating to it are covered in Section
+<a href="#orgf8551ae">7.4</a>.
+</p>
+
+<p>
+Note: BMS contains a variable, <code>infiniteScanning</code>, whose value is
+occasionally checked. This value is statically set to false and is never
+updated; hence we do not report behavioural changes due to this variable.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org939ebe8" class="outline-5">
+<h5 id="org939ebe8"><span class="section-number-5">7.2.7.3</span> ACTION_STOP</h5>
+<div class="outline-text-5" id="text-7-2-7-3">
+<p>
+<code>actionStop()</code> is called, which calls <code>Service.stopForeground()</code> and
+<code>Service.stopSelf()</code> to terminate the BMS service. This will eventually
+lead to a call to <code>onDestroy()</code>, which calls <code>stopService()</code>. We describe
+this in Section <a href="#org9dbbca2">7.2.8</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org74ca179" class="outline-5">
+<h5 id="org74ca179"><span class="section-number-5">7.2.7.4</span> ACTION_ADVERTISE</h5>
+<div class="outline-text-5" id="text-7-2-7-4">
+<p>
+The next advertisement is first scheduled via CommandHandler: an
+<code>ACTION_ADVERTISE</code> <i>Command</i> is scheduled to be processed after a delay of
+<code>advertisingDuration</code> (180s) + <code>advertisingGap</code> (5s).
+</p>
+
+<p>
+<code>runService()</code> then checks to see if the SwiftMED app is installed, and
+does nothing if so. Otherwise, it calls <code>actionAdvertise()</code>.
+</p>
+
+<p>
+<code>actionAdvertise()</code> sets up a new <i>BLEAdvertiser</i> if required, and then
+calls <code>BLEAdvertiser.startAdvertising()</code> with an advertising duration of
+<code>advertisingDuration</code> (180s).
+</p>
+
+<p>
+<i>BLEAdvertiser</i> (<i>bluetooth.BLEAdvertiser</i>) is a utility class wrapping
+around Android's <i>BluetoothLeAdvertiser</i>
+(<i>android.bluetooth.le.BluetoothLeAdvertiser</i>), abbreviated <i>BLA</i>
+below. When <code>startAdvertising()</code> is called, it will start advertising
+using <code>BLA.startAdvertising()</code>, with the UUID specified when
+<i>BLEAdvertiser</i> was created (in practice, <code>BMS.serviceUUID</code>), and with a
+manufacturer ID of 0x33 and data of random bytes <sup><a id="fnr.7" class="footref" href="#fn.7">7</a></sup>. After the specified advertising duration is over,
+<code>BLA.stopAdvertising()</code> is called to end advertising.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org9010bc8" class="outline-5">
+<h5 id="org9010bc8"><span class="section-number-5">7.2.7.5</span> ACTION_SELF_CHECK</h5>
+<div class="outline-text-5" id="text-7-2-7-5">
+<p>
+The next self-check (also referred to as a health check) is first
+scheduled using AlarmManager: a service intent for BMS containing a
+<code>ACTION_SELF_CHECK</code> <i>Command</i> is scheduled to be sent after a delay of
+<code>healthCheckInterval</code> (900s).
+</p>
+
+<p>
+<code>runService()</code> then checks to see if the SwiftMED app is installed, and
+does nothing if so. Otherwise, it calls <code>actionHealthCheck()</code>.
+</p>
+
+<p>
+<code>actionHealthCheck()</code> calls <code>performUserLoginCheck()</code>, which checks if the
+onboarding is complete but the user is not logged in. If so, it logs an
+event using Firebase analytics.
+</p>
+
+<p>
+Next, <code>performHealthCheck()</code> is called. If location permissions are not
+available or Bluetooth is turned off, it does nothing. Otherwise, it calls
+<code>setupService()</code> to initialize the <i>StreetPassServer</i>, <i>StreetPassScanner</i>
+and <i>BLEAdvertiser</i> objects should they not already be setup (see
+Section <a href="#org7f9d4a3">7.2.7.1</a>).
+</p>
+
+<p>
+The <i>CommandHandler</i> is then queried to check if a scan is scheduled; if
+not, a new scan is scheduled with a delay of 100ms. A similar check is
+done to see if an advertisement is scheduled, and a new advertisement is
+scheduled if not.
+</p>
+
+<p>
+Finally, <code>actionHealthCheck()</code> reschedules the <code>ACTION_PURGE</code> <i>Command</i> to
+be repeatedly sent <code>purgeInterval</code> (24h) after preference
+<code>LAST_PURGE_TIME</code>, as was done in <a href="#org7f9d4a3">7.2.7.1</a> <sup><a id="fnr.8" class="footref" href="#fn.8">8</a></sup>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org0876f63" class="outline-5">
+<h5 id="org0876f63"><span class="section-number-5">7.2.7.6</span> ACTION_UPDATE_BM</h5>
+<div class="outline-text-5" id="text-7-2-7-6">
+<p>
+Note: "BM" here refers to broadcast message, which is another term for the
+current valid TempID.
+</p>
+
+<p>
+The next TempID update is first scheduled using <i>AlarmManager</i>: a service
+intent for BMS containing an <code>ACTION_UPDATE_BM</code> <i>Command</i> is scheduled to be
+sent after a delay of <code>bmCheckInterval=</code> (540s).
+</p>
+
+<p>
+<code>runService()</code> then calls <code>actionUpdateBm()</code>. This function checks if a
+new batch of TempIDs should be downloaded. If so, or if <code>broadcastMessage</code>
+is null, <code>TempIDManager.getTemporaryIDs()</code> is called asynchronously. When
+the TempIDs are successfully downloaded, a new TempID is retrieved, and
+used to set <code>broadcastMessage</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org89b3543" class="outline-5">
+<h5 id="org89b3543"><span class="section-number-5">7.2.7.7</span> ACTION_PAUSE_FOR_SWIFTMED</h5>
+<div class="outline-text-5" id="text-7-2-7-7">
+<p>
+This action just changes the service's notification message to reflect
+that BlueTrace is paused due to SwiftMED.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgc2f99fa" class="outline-5">
+<h5 id="orgc2f99fa"><span class="section-number-5">7.2.7.8</span> ACTION_PURGE</h5>
+<div class="outline-text-5" id="text-7-2-7-8">
+<p>
+<code>actionPurge()</code> is called, which calls <code>performPurge()</code>, which starts a
+Kotlin coroutine. The coroutine calls
+<code>StreetPassRecordStorage.purgeOldRecords()</code> and
+<code>StatusRecordStorage.purgeOldRecords()</code>, with a purge timestamp of
+<code>purgeTTL</code> milliseconds (21 days) before the current time.
+</p>
+
+<p>
+Note that this action was removed in BlueTrace 2.1.4, with its
+functionality moved to the LightLifter component. Please see Section
+<a href="#orge1adb53">8</a> for more details.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org8a66f55" class="outline-5">
+<h5 id="org8a66f55"><span class="section-number-5">7.2.7.9</span> ACTION_USER_PAUSE</h5>
+<div class="outline-text-5" id="text-7-2-7-9">
+<p>
+<code>runService()</code> first extracts the pause timestamp from the associated
+intent's extra data; this timestamp is the time up till which BlueTrace
+should be paused, and we denote it as <code>pause_ts</code> below.
+</p>
+
+<p>
+If the <code>pause_ts</code> is non-negative, and in the future, <code>runService()</code> sets
+the preference <code>PAUSE_UNTIL</code> to <code>pause_ts</code>, and schedules an intent with
+action <code>ACTION_UNPAUSE</code> to be sent to <i>UnpauseAlarmReceiver</i>
+(<i>receivers.UnpauseAlarmReceiver</i>) at the time <code>pause_ts</code>.
+</p>
+
+<p>
+When <i>UnpauseAlarmReceiver</i> receives the intent, it will send a service
+intent to BMS with <i>Command</i> <code>ACTION_START</code>.
+</p>
+
+<p>
+If, however, <code>pause_ts</code> is negative, then the preference <code>PAUSE_UNTIL</code> is
+set to that negative value, and BMS is immediately sent a service intent
+with <i>Command</i> <code>ACTION_START</code>. This effectively unpauses BlueTrace.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org9dbbca2" class="outline-4">
+<h4 id="org9dbbca2"><span class="section-number-4">7.2.8</span> Teardown</h4>
+<div class="outline-text-4" id="text-7-2-8">
+<p>
+BMS is shut down when it receives the <code>ACTION_STOP</code> <i>Command</i>, or when other
+circumstances require it to be terminated. This will eventually call
+<code>stopService()</code>, which we describe here.
+</p>
+
+<p>
+<code>stopService()</code> first calls <code>teardown()</code>, which will in turn call
+<code>BLEAdvertiser.stopAdvertising()</code> (which calls <code>BLA.stopAdvertising()</code>),
+<code>StreetPassServer.tearDown()</code>, and <code>StreetPassScanner.stopScan()</code>. All
+pending messages in <i>CommandHandler</i> are removed, and any pending intents
+for scans, advertisements and TempID updates are cancelled.
+</p>
+
+<p>
+All the receivers setup during initialization are unregistered.
+</p>
+
+<p>
+Finally, StreetPassWorker is cleaned up by calling
+<code>StreetPassWorker.terminateConnections()</code> and
+<code>StreetPassWorker.unregisterReceivers()</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org1b19dad" class="outline-4">
+<h4 id="org1b19dad"><span class="section-number-4">7.2.9</span> System Startup</h4>
+<div class="outline-text-4" id="text-7-2-9">
+<p>
+BMS is started on boot via the <code>BOOT_COMPLETED</code> and <code>QUICKBOOT_POWERON</code>
+intents. As specified in <code>AndroidManifest.xml</code>, the class
+<i>boot.StartOnBootReceiver</i> will receive these intents. This utility class
+calls <code>Utils.scheduleStartMonitoringService()</code>, which will send a service
+intent to BMS with the <code>ACTION_START</code> <i>Command</i> after 500ms.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orga8a6cf9" class="outline-4">
+<h4 id="orga8a6cf9"><span class="section-number-4">7.2.10</span> Pause Feature Implementation</h4>
+<div class="outline-text-4" id="text-7-2-10">
+<p>
+BMS implements BlueTrace's pause feature, via the <i>Command</i>
+<code>ACTION_USER_PAUSE</code> and the preference <code>PAUSE_UNTIL</code>. When a pause is
+requested via the UI, an <code>ACTION_USER_PAUSE</code> <i>Command</i> is sent to BMS via an
+intent, with a timestamp indicating the time at which BMS should be paused
+till. As described in Section <a href="#org8a66f55">7.2.7.9</a>, this will set the
+<code>PAUSE_UNTIL</code> preference to the timestamp. Subsequently, checks in
+<code>onStartCommand()</code> and <code>runService()</code> will avoid performing any actions
+while the time <code>PAUSE_UNTIL</code> is in the future.
+</p>
+
+<p>
+Note however that there are no checks on <code>PAUSE_UNTIL</code> in other components
+such as StreetPass, BLE Services and FCMService; these components will
+still continue running. Due to the architecture of BlueTrace, this means
+that scanning and advertising will still continue until the scanning and
+advertising duration is reached; at that point, new scans/advertisements
+will be scheduled via CommandHandler, but as these are processed by
+<code>runService()</code>, they will be skipped.
+</p>
+
+<p>
+BlueTrace will automatically unpause itself once the <code>PAUSE_UNTIL</code>
+timestamp is in the past. The <i>UnpauseAlarmReceiver</i> registered when pausing
+takes place serves to trigger BMS to begin operations immediately at that
+point, instead of waiting till the next scheduled scan or advertisement.
+</p>
+
+<p>
+BlueTrace can be manually unpaused by providing a negative timestamp as an
+argument to the <code>ACTION_USER_PAUSE</code> <i>Command</i>. This happens when the user
+clicks the "unpause" button in the UI.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgc8b7b8b" class="outline-4">
+<h4 id="orgc8b7b8b"><span class="section-number-4">7.2.11</span> SwiftMED Detection</h4>
+<div class="outline-text-4" id="text-7-2-11">
+<p>
+BMS detects when SwiftMED is installed via <i>SwiftmedInstalledReceiver</i>
+(<i>receivers.SwiftmedInstalledReceiver</i>), which receives
+<code>android.intent.action.PACKAGE_ADDED</code> intents. When SwiftMED is installed,
+<i>SwiftmedInstalledReceiver</i> will send an intent to BMS with an
+<code>ACTION_PAUSE_FOR_SWIFTMED</code> <i>Command</i>. Similarly, <i>SwiftmedRemovedReceiver</i>
+(<i>receivers.SwiftmedRemovedReceiver</i>) detects when SwiftMED is removed, and
+will send an intent to BMS with an <code>ACTION_START</code> <i>Command</i>.
+</p>
+
+<p>
+The presence of SwiftMED is checked inside <code>runService()</code>, before
+advertising, scanning, and performing self-checks, and none of those
+actions are taken should SwiftMED be installed.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org077dc54" class="outline-3">
+<h3 id="org077dc54"><span class="section-number-3">7.3</span> TempIDManager</h3>
+<div class="outline-text-3" id="text-7-3">
+<p>
+TempIDManager manages BlueTrace TempIDs. It downloads TempIDs from a
+remote server, stores them on disk, and provides a TempID valid for the
+current time. The main class is <i>idmanager.TempIDManager</i>.
+</p>
+
+<p>
+There are two main management tasks required for TempIDs. First, the local
+store of TempIDs from the server needs to be kept populated, so the device
+will always have a valid TempID available locally. Second, a valid TempID
+should always be provided when sending that TempID to another device.
+</p>
+</div>
+
+<div id="outline-container-org20bb926" class="outline-4">
+<h4 id="org20bb926"><span class="section-number-4">7.3.1</span> TemporaryID</h4>
+<div class="outline-text-4" id="text-7-3-1">
+<p>
+TempIDs are represented using the <i>TemporaryID</i> class
+(<i>idmanager.TemporaryID</i>). The class has the following fields:
+</p>
+
+<ul class="org-ul">
+<li>start time, time at which this TempID is valid</li>
+<li>expiry time, time at which this TempID expires</li>
+<li>contents, the actual TempID value in the form of a Base64 string.</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-orga2e2f1e" class="outline-4">
+<h4 id="orga2e2f1e"><span class="section-number-4">7.3.2</span> Populating Local TempID Store</h4>
+<div class="outline-text-4" id="text-7-3-2">
+<p>
+The function <code>getTemporaryIDs()</code> is used to download new TempIDs from the
+remote server. It is asynchronous and returns a Task.
+</p>
+
+<p>
+<code>getTemporaryIDs()</code> makes an asynchronous Firebase function call to the
+function <code>getTempIDsV2</code>, with the following arguments:
+</p>
+<ul class="org-ul">
+<li><code>ttId</code>, set to the user's TTID</li>
+<li><code>appVersion</code>, set to the version of the app as reported by
+PackageManager</li>
+</ul>
+
+<p>
+If the call completes successfully, the callback registered by
+<code>getTemporaryIDs()</code> extracts the values <code>tempIDs</code>, <code>status</code>, and
+<code>refreshTime</code> from the returned result. It then verifies that <code>tempIDs</code> is
+an array of <i>TemporaryID</i> objects, and that <code>status</code> is a string of value
+"success". <code>tempIDs</code> is then converted into a JSON string using the Gson
+library, and then saved into the file <code>tempIDs</code> with UTF-8 encoding.
+</p>
+
+<p>
+The preference <code>NEXT_FETCH_TIME</code> is set to the value of <code>refreshTime</code>
+after converting it to milliseconds. The preference <code>LAST_FETCH_TIME</code> is
+set to the current time.
+</p>
+
+<p>
+Upon completion of the call, whether or not successful, a callback
+registered by <code>getTemporaryIDs()</code> creates a new <i>Metrics</i> object, and
+calls <code>Metrics.upload()</code>. See Section <a href="#orgbdaec54">2.2.2</a> for more information
+about this component.
+</p>
+</div>
+
+<div id="outline-container-org56bbd3b" class="outline-5">
+<h5 id="org56bbd3b"><span class="section-number-5">7.3.2.1</span> Keeping the store populated</h5>
+<div class="outline-text-5" id="text-7-3-2-1">
+<p>
+The logic for keeping the store populated mostly resides in BMS. We will
+describe it here for clarity.
+</p>
+
+<p>
+BMS will always call <code>getTemporaryIDs()</code> when it is started, via the
+<code>ACTION_START</code> <i>Command</i>. Subsequently, it checks to see if the TempID store
+needs to be updated at two different places. First, when processing the
+<code>ACTION_UPDATE_BM</code> <i>Command</i>, which is scheduled to happen every
+<code>bmCheckInterval=</code> ms (540s). Next, when processing the <code>ACTION_SCAN</code>
+<i>Command</i>, before a scan takes place, which is scheduled to happen slightly
+more than once every minute.
+</p>
+
+<p>
+BMS determines if new TempIDs need to be downloaded by calling the
+<code>needToUpdate()</code> function. <code>needToUpdate()</code> returns true if the current
+time is past the preference <code>NEXT_FETCH_TIME</code>.
+</p>
+
+<p>
+Thus, while BMS is operating normally, a new batch of TempIDs will be
+requested from the server within a few minutes from the time specified by
+the server, as stored in the preference <code>NEXT_FETCH_TIME</code>. Assuming the
+server always provides more than sufficient TempIDs for that interval, and
+that BlueTrace is able to successfully download the TempIDs when needed,
+the local TempID store should always contain a currently valid TempID.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org0621fde" class="outline-4">
+<h4 id="org0621fde"><span class="section-number-4">7.3.3</span> Retrieving Valid TempID</h4>
+<div class="outline-text-4" id="text-7-3-3">
+<p>
+Other components can ask TempIDManager for a currently valid TempID by
+calling the function <code>retrieveTemporaryID()</code>.
+</p>
+
+<p>
+<code>retrieveTemporaryID()</code> reads the contents of the file <code>tempIDs</code>, and then
+converts it into an array of <i>TemporaryID</i> objects by deserializing it using
+Gson. The array is then sorted by start time, and then converted into a
+<i>Queue</i> by creating a <i>LinkedList</i> and inserting the elements of the array
+into the list. Finally, the first <i>TemporaryID</i> in the queue that is valid
+(the current time falls between the start time and the expiry time) is
+returned.
+</p>
+</div>
+
+<div id="outline-container-org49d8595" class="outline-5">
+<h5 id="org49d8595"><span class="section-number-5">7.3.3.1</span> Enforcing use of valid TempID</h5>
+<div class="outline-text-5" id="text-7-3-3-1">
+<p>
+The logic to ensure only valid TempIDs are sent to other devices is
+located in a few different components. We describe the code flow here.
+</p>
+
+<p>
+TempIDs are sent to other devices via StreetPass, which constructs the
+contact tracing records to be transmitted. StreetPass always calls the
+function <code>TracerApp.thisDeviceMsg()</code> to retrieve the currently valid
+TempID.
+</p>
+
+<p>
+<code>TracerApp.thisDeviceMsg()</code> will first inspect the <i>TemporaryID</i> object
+stored at <code>BMS.broadcastMessage</code>. If this
+<i>TemporaryID</i> is valid, then the contents (i.e. the actual TempID as a
+Base64-encoded string) is returned. Otherwise, <code>retrieveTemporaryID()</code> is
+called to get a new, valid <i>TemporaryID</i> object from the local store. This
+object is then set as the new value of <code>broadcastMessage</code>, and its
+contents is returned. Thus, StreetPass will always send a valid TempID to
+other devices.
+</p>
+
+<p>
+At the same time, BMS updates the value of <code>broadcastMessage</code> in several
+places: after downloading new TempIDs via <code>getTemporaryIDs()</code> when
+processing <code>ACTION_START</code>, <code>ACTION_SCAN</code>, and <code>ACTION_UPDATE_BM</code>
+/Command/s. In each of these cases, <code>retrieveTemporaryID()</code> is used to get
+a valid TemporaryID object.
+</p>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgf8551ae" class="outline-3">
+<h3 id="orgf8551ae"><span class="section-number-3">7.4</span> StreetPass</h3>
+<div class="outline-text-3" id="text-7-4">
+<p>
+StreetPass is a collection of classes that manage the dissemination and
+storage of contact tracing records. They are mostly located in the
+<i>streetpass.*</i> namespace, and consist of the following:
+</p>
+
+<ul class="org-ul">
+<li><b>StreetPassScanner</b> (<i>streetpass.StreetPassScanner</i>), manages scanning of
+BlueTrace devices</li>
+<li><b>StreetPassWorker</b> (<i>streetpass.StreetPassWorker</i>), processes a list of
+found BlueTrace devices, retrieving and sending contact tracing records</li>
+<li><b>StreetPassReceiver</b> (<i>BMS.StreetPassReceiver</i>), coordinate
+storing of contact tracing records</li>
+<li><b>StreetPassRecordDatabase</b> (<i>streetpass.persistence.*</i>), database for
+storing contact tracing records</li>
+<li><b>StreetPassServer</b> (<i>streetpass.StreetPassServer</i>), listens for requests
+from other BlueTrace devices and responds accordingly.</li>
+</ul>
+
+<p>
+Unless otherwise specified, class names in this section will be relative
+to the namespace <i>sg.gov.tech.bluetrace.streetpass</i>.
+</p>
+</div>
+
+<div id="outline-container-orgbdd8ff1" class="outline-4">
+<h4 id="orgbdd8ff1"><span class="section-number-4">7.4.1</span> StreetPassScanner</h4>
+<div class="outline-text-4" id="text-7-4-1">
+<p>
+StreetPassScanner (<code>StreetPassScanner</code>) is used to detect nearby BlueTrace
+devices, and add them to a worklist for processing. It uses a <i>BLEScanner</i>,
+part of the BLE Services component, to perform the actual scanning.
+</p>
+</div>
+
+<div id="outline-container-org192f814" class="outline-5">
+<h5 id="org192f814"><span class="section-number-5">7.4.1.1</span> Initialization</h5>
+<div class="outline-text-5" id="text-7-4-1-1">
+<p>
+A <i>StreetPassScanner</i> object is created by BMS when processing the
+<code>ACTION_START</code> <i>Command</i>. This will create a new <i>BLEScanner</i> object
+associated with the <i>StreetPassScanner</i>, with the service UUID that was
+provided by BMS. In addition, a <i>BleScanCallback</i>
+(<i>StreetPassScanner.BleScanCallback</i>) object is created, which is a
+callback object for BLE events (see documentation for
+<i>android.bluetooth.le.ScanCallback</i>).
+</p>
+</div>
+</div>
+
+<div id="outline-container-org66696dd" class="outline-5">
+<h5 id="org66696dd"><span class="section-number-5">7.4.1.2</span> Scanning</h5>
+<div class="outline-text-5" id="text-7-4-1-2">
+<p>
+When processing an <code>ACTION_SCAN</code> <i>Command</i>, BMS will perform a scan by
+calling <code>StreetPassScanner.startScan()</code>.
+</p>
+
+<p>
+<code>startScan()</code> will call <code>BLEScanner.startScan()</code>, with the
+<i>BleScanCallback</i> instance as the callback object. The counter
+<code>scannerCount</code> is also incremented. <code>startScan()</code> then schedules a
+callback to run after a delay of <code>scanDurationInMillis</code> (BMS sets this to
+<code>BMS.scanDuration</code>, 8s), which will call <code>stopScan()</code> to terminate
+scanning. At this point, <code>startScan()</code> returns, and subsequent processing
+happens when the callbacks in <i>BleScanCallback</i> are called.
+</p>
+
+<p>
+<i>BLEScanner</i> is a utility class wrapping around Android's
+<i>BluetoothLeScanner</i> class (<i>android.bluetooth.le.BluetoothLeScanner</i>). It
+scans for nearby BLE devices that advertise a specific UUID
+(<code>BMS.serviceUUID</code>, B82AB3FC-1595-4F6A-80F0-FE094CC218F9), and calls
+<code>onScanResult()</code> on the registered callback object (i.e. <i>BleScanCallback</i>)
+for each matching device found.
+</p>
+
+<p>
+When <code>BleScanCallback.onScanResult()</code> is called, it is provided a single
+scan result corresponding to a discovered device. It extracts the
+manufacturer-specific data for manufacturer ID <code>0x3ff</code> <sup><a id="fnr.9" class="footref" href="#fn.9">9</a></sup> as a UTF-8 string, and creates a
+<i>ConnectablePeripheral</i> object containing the aforementioned data, the
+transmission power, and the RSSI.
+</p>
+
+<p>
+It then uses <i>LocalBroadcastManager</i> to send an <code>ACTION_DEVICE_SCANNED</code>
+intent with the Blueteooth device and <i>ConnectablePeripheral</i> as extra
+data. This intent will be picked up by StreetPassWorker to continue
+processing the detected device.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgc89398f" class="outline-5">
+<h5 id="orgc89398f"><span class="section-number-5">7.4.1.3</span> Teardown</h5>
+<div class="outline-text-5" id="text-7-4-1-3">
+<p>
+StreetPassScanner terminates the scanning process when <code>stopScan()</code> is
+called, by calling <code>BLEScanner.stopScan()</code>. It also decrements
+<code>scannerCount</code>. <code>stopScan()</code> is scheduled to be called by <code>startScan()</code>,
+and is also called when BMS terminates.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org3420dac" class="outline-4">
+<h4 id="org3420dac"><span class="section-number-4">7.4.2</span> StreetPassWorker</h4>
+<div class="outline-text-4" id="text-7-4-2">
+<p>
+StreetPassWorker manages the exchange of contact tracing records when a
+device acts as a Central device (StreetPassServer manages the logic when
+devices acts as Peripheral devices). Peripheral devices discovered by
+StreetPassScanner are added to a work queue in StreetPassWorker, which
+will go through each device and exchange records as required by the protocol.
+</p>
+</div>
+
+<div id="outline-container-org36677d6" class="outline-5">
+<h5 id="org36677d6"><span class="section-number-5">7.4.2.1</span> Initialization</h5>
+<div class="outline-text-5" id="text-7-4-2-1">
+<p>
+A <i>StreetPassWorker</i> object is created in <code>BMS.setup()</code>. The constructor
+performs the following actions:
+</p>
+
+<ul class="org-ul">
+<li>Create a work queue (<code>workQueue</code>) of pending <i>Work</i> objects</li>
+<li>Create a blacklist (<code>blacklist</code>) of devices that have already been
+processed</li>
+<li>Initialize a work timeout listener,
+<code>onWorkTimeoutListener</code></li>
+<li>Register <i>ScannedDeviceReceiver</i> to receive local
+<code>ACTION_DEVICE_SCANNED</code> intents</li>
+<li>Register <i>BlacklistReceiver</i> to receive local <code>ACTION_DEVICE_PROCESSED</code>
+intents</li>
+<li>Create <i>Handlers</i> for scheduling callbacks</li>
+</ul>
+
+<p>
+<i>ScannedDeviceReceiver</i> will receive the intents broadcasted by
+StreetPassScanner whenever a BlueTrace device is detected.
+</p>
+
+<p>
+StreetPassWorker keeps track of the current <i>Work</i> object being processed in
+the property <code>currentWork</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org473da4c" class="outline-5">
+<h5 id="org473da4c"><span class="section-number-5">7.4.2.2</span> Work objects</h5>
+<div class="outline-text-5" id="text-7-4-2-2">
+<p>
+The <i>Work</i> class represents a unit of work that needs to be done by
+StreetPassWorker. Each <i>Work</i> object corresponds to a single BlueTrace
+peripheral device that must be processed, i.e. that contact tracing
+records must be exchanged with. Each <i>Work</i> object has the following
+properties:
+</p>
+
+<ul class="org-ul">
+<li>a checklist, which keeps track of what actions have already taken
+place for this unit of work</li>
+<li>the associated <i>ConnectablePeripheral</i> object</li>
+<li>the associated Bluetooth device</li>
+<li>an associated <i>BluetoothGatt</i> object, used to perform GATT operations</li>
+<li>a creation timestamp, set to the time at which the <i>Work</i> was created</li>
+<li>a timeout timestamp, indicating the time at which this work unit will
+time out</li>
+<li>a callback to be called when the work unit times out.</li>
+</ul>
+
+<p>
+A <i>Work</i> object is started by calling <code>Work.startWork()</code>, with a
+<i>CentralGattCallback</i> (<i>StreetPassWorker.CentralGattCallback</i>) object as
+an argument. <code>startWork()</code> will then call <code>BluetoothDevice.connectGatt()</code>
+with the provided callback; the callback will handle subsequent operations
+for this work unit. The associated <i>BluetoothGatt</i> object will also be
+initialized to the return value of <code>connectGatt()</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org7493c32" class="outline-5">
+<h5 id="org7493c32"><span class="section-number-5">7.4.2.3</span> Receiving ACTION_DEVICE_SCANNED Intents</h5>
+<div class="outline-text-5" id="text-7-4-2-3">
+<p>
+Local <code>ACTION_DEVICE_SCANNED</code> intents are received by
+<i>ScannedDeviceReceiver</i>. The associated Bluetooth device and
+<i>ConnectablePeripheral</i> object are extracted from the intent's extra data,
+and used to construct a new Work object, along with
+<code>onWorkTimeoutListener</code> as the timeout handler.
+</p>
+
+<p>
+<i>ScannedDeviceReceiver</i> then calls <code>StreetPassWorker.addWork()</code> to add the
+<i>Work</i> object to the queue, and then <code>StreetPassWorker.doWork()</code> to process
+the work queue.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgeedded1" class="outline-5">
+<h5 id="orgeedded1"><span class="section-number-5">7.4.2.4</span> Adding Work</h5>
+<div class="outline-text-5" id="text-7-4-2-4">
+<p>
+<code>StreetPassWorker.addWork()</code> adds a <i>Work</i> object to the work queue, given
+the following conditions:
+</p>
+
+<ul class="org-ul">
+<li>The Bluetooth address of the device associated with the <i>Work</i> object does
+not match that of the <i>Work</i> object stored in
+<code>StreetPassWorker.currentWork</code>.</li>
+<li>The address is not in the blacklist of already-processed devices.</li>
+</ul>
+
+<p>
+Next, the work queue is checked to see if it contains any <i>Work</i> with the
+same address as the new Work object. If no such <i>Work</i> was found, then the
+new <i>Work</i> is added to the queue, and a callback is scheduled to run
+after a delay of <code>BMS.maxQueueTime</code> (7s). This callback will remove the
+<i>Work</i> object from the queue should it still be present.
+</p>
+
+<p>
+If an older <i>Work</i> object is found, then it is removed from the queue,
+and the new <i>Work</i> object is added to the queue. However, the timeout
+handler that was previously registered for the older <i>Work</i> object does not
+get removed, and a new timer is not created either. <i>This results in a bug</i>:
+this particular timeout mechanism does not work properly when a new <i>Work</i>
+object replaces an older one. However, as expired objects get removed from
+the work queue in <code>doWork()</code> as well, this ultimately does not cause any
+problems.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org2261e8c" class="outline-5">
+<h5 id="org2261e8c"><span class="section-number-5">7.4.2.5</span> Processing Work</h5>
+<div class="outline-text-5" id="text-7-4-2-5">
+<p>
+Work in the work queue is processed when <code>StreetPassWorker.doWork()</code> is
+called, which happens when <i>ScannedDeviceReceiver</i> handles an
+<code>ACTION_DEVICE_SCANNED</code> intent. <code>doWork()</code> also gets called in several
+other places, mostly after some work processing has been done, e.g. after
+a <i>Work</i> object has been marked as finished in
+<code>StreetPassWorker.finishWork()</code>. The logic in <code>doWork()</code> is somewhat
+convoluted, possibly due to repeated changes to handle different kinds of
+edge cases.
+</p>
+
+<p>
+<code>doWork()</code> first checks to see if <code>StreetPassWorker.currentWork</code> is
+set. If so, it checks if <code>currentWork</code> has been marked finished, or if the
+timeout has passed. If this is also true, then
+<code>BluetoothGatt.disconnect()</code> is called on the associated <i>BluetoothGatt</i>
+object; this is meant to handle dangling connections. Note that this
+eventually triggers a callback associated with the <i>BluetoothGatt</i> object
+(<code>CentralGattCallback.onConnectionStateChange()</code>) which sets <code>currentWork</code>
+to null.
+</p>
+
+<p>
+Otherwise, a suitable <i>Work</i> object is taken from the queue. If the queue is
+empty, <code>doWork()</code> returns. Otherwise, <i>Work</i> objects whose creation
+timestamp is more than <code>BMS.maxQueueTime</code> (7s) ago are removed from the
+front of the queue, till a <i>Work</i> object that has not timed out is
+retrieved. If no such <i>Work</i> object can be found, then <code>doWork()</code> returns.
+</p>
+
+<p>
+Should a suitable <i>Work</i> object be found, it is first checked to see if it
+is in the blacklist, and is skipped if so. <code>doWork()</code> is called again to
+process the next <i>Work</i> object.
+</p>
+
+<p>
+Next, <code>doWork()</code> checks if there is already an active Bluetooth connection
+to the associated device. If so, the Work object is marked as skipped and
+<code>finishWork()</code> is called; see Section <a href="#org2a90ead">7.4.2.7</a>.
+</p>
+
+<p>
+Otherwise, the <i>Work</i> object represents a new, uncontacted BlueTrace
+device with which we need to exchange contact tracing records. <code>doWork()</code>
+will then create a new <i>CentralGattCallback</i> object, call
+<code>Work.startWork()</code> with this callback, and call <code>BluetoothGatt.connect()</code>
+to establish the BLE connection. Subsequent processing then happens within
+the <i>CentralGattCallback</i> object.
+</p>
+
+<p>
+A callback to call the <i>Work</i> object's timeout handler is scheduled after a
+delay of <code>BMS.connectionTimeout</code> (6s). The timeout value of the <i>Work</i>
+object is also set to <code>BMS.connectionTimeout</code> (6s) in the future.
+</p>
+
+<p>
+If the attempt to establish the BLE connection fails, <code>doWork()</code> will move
+on to process the next work unit in the queue.
+</p>
+</div>
+</div>
+
+
+<div id="outline-container-org698e420" class="outline-5">
+<h5 id="org698e420"><span class="section-number-5">7.4.2.6</span> CentralGattCallback</h5>
+<div class="outline-text-5" id="text-7-4-2-6">
+<p>
+<i>CentralGattCallback</i> (<i>StreetPassWorker.CentralGattCallback</i>) manages the
+actual contact tracing record exchange. Callback functions named here are
+relative to the class namespace. We describe the callbacks in the order at
+which they are triggered.
+</p>
+
+<p>
+The callback <code>onConnectionStateChange()</code> gets triggered when
+<code>BluetoothGatt.connect()</code> is called in <code>StreetPassWorker.doWork()</code>, with a
+new state of <code>BluetoothProfile.STATE_CONNECTED</code>
+(0x2). <i>CentralGattCallback</i> will then request for the MTU of the
+connection to be changed to 512 bytes.
+</p>
+
+<p>
+The MTU change triggers <code>onMtuChanged()</code>. Regardless of whether the change
+is successful, <code>onMtuChanged()</code> will discover the available services on
+the remote device, by calling <code>BluetoothGatt.discoverServices()</code> on the
+<i>BluetoothGatt</i> object associated with the work unit.
+</p>
+
+<p>
+This in turn triggers <code>onServicesDiscovered()</code>, which will search for a
+service with UUID <code>StreetPassWorker.serviceUUID</code>
+(B82AB3FC-1595-4F6A-80F0-FE094CC218F9), containing a characteristic with
+UUID <code>StreetPassWorker.characteristicV2</code>
+(117BDD58-57CE-4E7A-8E87-7CCCDDA2A804). This characteristic can be read
+from in order to retrieve the remote device's contact tracing record.
+</p>
+
+<p>
+<code>onServicesDiscovered()</code> will request to read the value of the
+characteristic by calling <code>BluetoothGatt.readCharacteristic()</code>. If the
+service or characteristic are not found, <code>onServicesDiscovered()</code> will
+terminate the connection by calling <code>endWorkConnection()</code>.
+</p>
+
+<p>
+When the value of the characteristic is read successfully, the callback
+<code>onCharacteristicRead()</code> is triggered. If the read was successful,
+<code>onCharacteristicRead()</code> first determines a suitable protocol
+implementation (subclass of <i>BlueTraceProtocol</i>) to handle the
+characteristic, based on the UUID value <sup><a id="fnr.10" class="footref" href="#fn.10">10</a></sup>. As this device is operating
+as a Central device, the <code>BlueTraceProtocol.central</code> object is used, which
+implements <i>CentralInterface</i>. 
+<code>central.processReadRequestDataReceived()</code> is then called with the
+value of the characteristic, the address of the remote device, and the
+RRSI and transmission power values from the <i>ConnectablePeripheral</i>
+associated with the <i>Work</i> object. Note that the value of the
+characteristic here is the Encounter Message sent by the Peripheral.
+</p>
+
+<p>
+<code>processReadRequestDataReceived()</code> returns a <i>ConnectionRecord</i> object.
+An <code>ACTION_RECEIVED_STREETPASS</code> intent is then broadcasted with the
+<i>ConnectionRecord</i> bundled. StreetPassReceiver will receive this intent
+and complete processing of the received contact tracing record.
+</p>
+
+<p>
+Regardless of whether the read was successful, <code>onCharacteristicRead()</code>
+will move on writing to the same characteristic, in order to send this
+device's contact tracing record to the remote device. A suitable protocol
+implementation is retrieved, and the Encounter Message is generated using
+<code>central.prepareWriteRequestData()</code>. The RSSI and
+transmission power values from the ConnectablePeripheral are passed
+in. <code>onCharacteristicRead()</code> then calls
+<code>BluetoothGattCharacteristic.setValue()</code> to set the value of the
+characteristic to the Encounter Message, and
+<code>BluetoothGatt.writeCharacteristic()</code> to send the value to the remote
+device.
+</p>
+
+<p>
+Note that <code>onCharacteristicRead()</code> calls <code>TempIDManager.bmValid()</code>,
+supposedly to check if the TempID stored at <code>BMS.broadcastMessage</code> is
+valid for the current time, but this function always returns true. As
+detailed in Section <a href="#org077dc54">7.3</a>, ultimately the TempID used in
+contact tracing records sent out by the device are enforced to be valid
+via <code>TracerApp.thisDeviceMsg()</code>.
+</p>
+
+<p>
+Once the write to the remote device is complete, the callback
+<code>onCharacteristicWrite()</code> is triggered. <code>onCharacteristicWrite()</code> records
+if the write was successful, and then calls <code>endWorkConnection()</code> to clear
+up.
+</p>
+</div>
+
+<ul class="org-ul">
+<li><a id="org4ff1a8f"></a>Closing the connection<br>
+<div class="outline-text-6" id="text-org4ff1a8f">
+<p>
+<code>endWorkConnection()</code> is called whenever the connection needs to be
+terminated. It calls <code>BluetoothGatt.disconnect()</code> to disconnect from the
+remote device.
+</p>
+
+<p>
+When the BLE connection is disconnected, whether via <code>endWorkConnection()</code>
+or something else, <code>onConnectionStateChange()</code> will be triggered with a
+status of <code>BluetoothProfile.STATE_DISCONNECTED</code>. When this happens, the
+following actions are taken:
+</p>
+
+<ul class="org-ul">
+<li>The timeout callback of the Work object is removed.</li>
+<li>If the associated address of <code>StreetPassWorker.currentWork</code> matches that
+of the address associated with this <i>CentralGattCallback</i>, <code>currentWork</code>
+will be set to null.</li>
+<li>The BLE connection is closed via <code>BluetoothGatt.close()</code>.</li>
+<li>The <i>Work</i> object is marked finished by calling
+<code>StreetPassWorker.finishWork()</code>.</li>
+</ul>
+</div>
+</li>
+</ul>
+</div>
+
+<div id="outline-container-org2a90ead" class="outline-5">
+<h5 id="org2a90ead"><span class="section-number-5">7.4.2.7</span> Finishing Work</h5>
+<div class="outline-text-5" id="text-7-4-2-7">
+<p>
+<i>Work</i> objects are cleaned up by calling <code>finishWork()</code>. This function
+first verifies the <i>Work</i> object has not already been marked finished. It
+then inspects the <i>Work</i> object's checklist to see if critical actions have
+been completed: that a connection was established, a contact tracing
+record was received, and a contact tracing record was sent; or that the
+Work object was marked as skipped. If so, a local intent
+<code>ACTION_DEVICE_PROCESSED</code> is broadcasted including the address of the
+remote device.
+</p>
+
+<p>
+The timeout callback of the <i>Work</i> object is removed, if it has not been
+already. The <i>Work</i> object is marked finished. <code>doWork()</code> is then called
+to process the next item on the work queue.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org4bb5abd" class="outline-5">
+<h5 id="org4bb5abd"><span class="section-number-5">7.4.2.8</span> Queue and Work Timeouts</h5>
+<div class="outline-text-5" id="text-7-4-2-8">
+<p>
+StreetPassWorker manages the work queue and <i>Work</i> objects through two
+timeout mechanisms to clean up and remove old work units.
+</p>
+
+<p>
+The first timeout mechanism removes <i>Work</i> objects from the queue if they
+have been in the queue for longer than <code>BMS.maxQueueTime</code> (7s). This
+happens in two places: when a callback set in <code>addWork()</code> is triggered at
+the timeout time, and when timed-out <i>Work</i> objects are removed from the
+queue in <code>doWork()</code>. Since <i>Work</i> objects in the queue have yet to be
+processed, so there is no additional clean-up required for them.
+</p>
+
+<p>
+<i>Work</i> objects are only processed when they are removed from the queue in
+<code>doWork()</code>. At this point, a <i>Work</i> object being processed is assigned to
+<code>currentWork</code>. The second timeout mechanism is setup here: a timeout value
+is set on the <i>Work</i> object for <code>BMS.connectionTimeout</code> (6s), and the
+<i>Work</i> object's timeout handler (effectively <code>onWorkTimeoutListener</code>) is
+set to trigger after that same delay. <code>onWorkTimeoutListener</code> performs the
+necessary cleanup of a <i>Work</i> object that has timed out while processing
+is taking place.
+</p>
+
+<p>
+In addition, <code>doWork()</code> also checks the timeout value of <code>currentWork</code>
+(which was set when the Work object was first assigned to <code>currentWork</code>,
+as above). If <code>currentWork</code> has timed out, then
+<code>BluetoothGatt.disconnect()</code> is called to disconnect from the associated
+device; this will eventually lead to <code>finishWork()</code> being called.
+</p>
+
+<p>
+The <code>onWorkTimeoutListener</code> callback handles the various situations Work
+objects could be in when a timeout occurs. It goes through the Work
+object's checklist to determine its state, and acts accordingly:
+</p>
+
+<ul class="org-ul">
+<li>No connection established:
+<ul class="org-ul">
+<li>Set <code>currentWork</code> to null</li>
+<li>Close BluetoothGatt client</li>
+<li>Call <code>finishWork()</code></li>
+</ul></li>
+<li>Already disconnected:
+<ul class="org-ul">
+<li>Do nothing, wait for <code>CentralGattCallback.onConnectionStateChange()</code>
+to do the cleanup.</li>
+</ul></li>
+<li>Connected:
+<ul class="org-ul">
+<li>Set <code>currentWork</code> to null</li>
+<li>Disconnect from remote device</li>
+<li>Call <code>finishWork()</code></li>
+</ul></li>
+</ul>
+
+<p>
+Thus in all cases, the connection to the remote device will be closed if
+necessary, <code>finishWork()</code> will be called to do the final cleanup, and
+<code>currentWork</code> will be set to null, allowing <code>doWork()</code> to begin processing
+a new Work object.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org2d9bc37" class="outline-5">
+<h5 id="org2d9bc37"><span class="section-number-5">7.4.2.9</span> Blacklist Management</h5>
+<div class="outline-text-5" id="text-7-4-2-9">
+<p>
+<i>BlacklistReceiver</i> (<i>StreetPassWorker.BlackListReceiver</i>) is a simple
+class that manages StreetPassWorker's blacklist
+(<code>StreetPassWorker.blacklist</code>): a list of devices that have already been
+processed and thus do not need to be re-contacted. <i>BlacklistReceiver</i>
+receives <code>ACTION_DEVICE_PROCESSED</code> intents, sent by StreetPassWorker in
+<code>finishWork()</code>, and StreetPassServer when a record has been received from
+a Central device. It will then add the associated address to the
+blacklist, and also schedule a callback to remove the address from the
+blacklist after a delay of <code>BMS.blacklistDuration</code> (100s).
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgdde3ae6" class="outline-4">
+<h4 id="orgdde3ae6"><span class="section-number-4">7.4.3</span> StreetPassReceiver</h4>
+<div class="outline-text-4" id="text-7-4-3">
+<p>
+StreetPassReceiver (<i>BMS.StreetPassReceiver</i>) is a small class that is
+registered to receive <code>ACTION_RECEIVED_STREETPASS</code> intents. For some
+reason it is implemented as an inner class of BluetoothMonitoringService.
+</p>
+
+<p>
+When an <code>ACTION_RECEIVED_STREETPASS</code> intent is received,
+StreetPassReceiver will extract the associated <i>ConnectionRecord</i>, and
+then use the values within to create a new <i>StreetPassRecord</i>. A coroutine
+is then launched to save the <i>StreetPassRecord</i>, by calling
+<code>StreetPassRecordStorage.saveRecord()</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org874acb1" class="outline-4">
+<h4 id="org874acb1"><span class="section-number-4">7.4.4</span> StreetPassServer</h4>
+<div class="outline-text-4" id="text-7-4-4">
+<p>
+StreetPassServer manages the exchange of contact tracing records when a
+device acts as a Peripheral device (see StreetPassWorker for corresponding
+Central device code). A new <i>StreetPassServer</i> object is created by BMS when
+processing the <code>ACTION_START</code> <i>Command</i>.
+</p>
+</div>
+
+<div id="outline-container-org82046e4" class="outline-5">
+<h5 id="org82046e4"><span class="section-number-5">7.4.4.1</span> Initialization</h5>
+<div class="outline-text-5" id="text-7-4-4-1">
+<p>
+When a <i>StreetPassServer</i> object is created by BMS, <code>serviceUUIDString</code> is
+set to a value of <code>BMS.serviceUUID</code>
+(B82AB3FC-1595-4F6A-80F0-FE094CC218F9). A <i>GattServer</i> object,
+<code>gattServer</code> is then created using <code>setupGattServer()</code>, with a UUID of
+<code>serviceUUIDString</code>. StreetPassServer then starts the server with
+<code>GattServer.startServer()</code>, creates a new GattService with the same UUID,
+and adds the service to the server using <code>GattServer.addService()</code>. Once
+this is complete, a service will be running that allows BlueTrace to act
+as a Peripheral device.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org03af86a" class="outline-5">
+<h5 id="org03af86a"><span class="section-number-5">7.4.4.2</span> GattServer and GattService</h5>
+<div class="outline-text-5" id="text-7-4-4-2">
+<p>
+GattServer (<i>bluetooth.gatt.GattServer</i>) is an implementation of a BLE
+server that responds to GATT requests from a Central devices. It is mostly
+a a wrapper around Android's
+<i>BluetoothGattServer</i> (<i>android.bluetooth.BluetoothGattServer</i>) class.
+</p>
+
+<p>
+When <code>startServer()</code> is called by StreetPassServer, GattServer creates a
+new <i>BluetoothGattServer</i> object by calling
+<code>BluetoothManager.openGattServer()</code>, providing <code>gattServerCallback</code> as the
+callback class.
+</p>
+
+<p>
+GattService (<i>bluetooth.gatt.GattService</i>) is similarly a wrapper around
+Android's <i>BluetoothGattService</i>
+(<i>android.bluetooth.BluetoothGattService</i>). When initialized, it creates a
+new <i>BluetoothGattService</i> with the provided UUID, and also adds two
+<i>BluetoothGattCharacteristic</i> objects
+(<i>android.bluetooth.BluetoothGattCharacteristic</i>):
+</p>
+
+<ul class="org-ul">
+<li><code>characteristicV1</code>, same UUID as service, read and write permissions</li>
+<li><code>characteristicV2</code>, UUID 117BDD58-57CE-4E7A-8E87-7CCCDDA2A804, read and
+write permissions</li>
+</ul>
+
+<p>
+A created <i>GattService</i> object can be added to a <i>GattServer</i> using
+<code>addService()</code>. <code>addService()</code> calls <code>BluetoothGattServer.addService()</code>
+with the <i>GattService</i>'s underlying <i>BluetoothGattService</i> object, to
+register the service with the server.
+</p>
+
+<p>
+After creating a <i>GattServer</i> and adding a <i>GattService</i>, the underlying
+<i>BluetoothGattServer</i> is initialized and ready to accept requests from
+BlueTrace Central devices.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org98a5344" class="outline-5">
+<h5 id="org98a5344"><span class="section-number-5">7.4.4.3</span> GattServer Callbacks</h5>
+<div class="outline-text-5" id="text-7-4-4-3">
+<p>
+GattServer registers an anonymous callback object, <code>gattServerCallback</code>,
+with the underlying BluetoothGattServer object. Callbacks in this object
+get triggered when specific GATT actions happen. See the Android
+documentation for <i>BluetoothGattServer</i> for more details.
+</p>
+
+<p>
+The callback object contains 3 maps for storing data, all indexed by
+device address:
+</p>
+<ul class="org-ul">
+<li><code>readPayloadMap</code>, a cache of previously sent Encounter Messages</li>
+<li><code>writeDataPayload</code>, to temporarily store data received from Central devices</li>
+<li><code>deviceCharacteristicMap</code>, to keep track of which characteristic was
+requested by which device</li>
+</ul>
+
+<p>
+As per the BlueTrace protocol, the series of events when a BlueTrace
+Central devices contacts a Peripheral device is as follows: 
+</p>
+
+<ol class="org-ol">
+<li>Connection is established</li>
+<li>Central requests to read value of characteristic, i.e. we need to send
+a contact tracing record</li>
+<li>Central requests to write a value to the characteristic, i.e. we need
+to receive a contact tracing record</li>
+<li>Connection is closed</li>
+</ol>
+
+<p>
+We will describe the callbacks in <code>gattServerCallback</code> based on the order
+above.
+</p>
+
+<p>
+When a connection is first established, <code>onConnectionStateChange()</code> is
+called, but it does not do anything when the new state is
+<code>STATE_CONNECTED</code>.
+</p>
+
+<p>
+Next, the Central requests to read the value of a characteristic,
+triggering <code>onCharacteristicReadRequest()</code>. The callback first determines
+a suitable protocol implementation (subclass of <i>BlueTraceProtocol</i>) to
+handle the requested characteristic (see Section <a href="#orge817835">7.5</a> for
+more details), and uses the <code>BlueTraceProtocol.peripheral</code>
+<i>PeripheralInterface</i> object. Then, <code>readPayloadMap</code> is consulted to see
+if we have a cached copy of the Encounter Message to be sent to the
+Central device, based on the Central device's address. If not, an
+Encounter Message is generated using <code>peripheral.prepareReadRequestData()</code>
+and cached.
+</p>
+
+<p>
+The read request from the Central can have an offset specified;
+<code>onCharacteristicReadRequest()</code> offsets the Encounter Message based on
+the provided value. The result is then sent using
+<code>BluetoothGattServer.sendResponse()</code>.
+</p>
+
+<p>
+After the Central successfully reads the characteristic, it will then
+request to write to the characteristic. This triggers
+<code>onCharacteristicWriteRequest()</code>. GATT supports two forms of write
+requests, a normal write and a <i>long</i> write. For long writes, the
+<code>preparedWrite</code> argument is set to true, and when the write is complete,
+the <code>onExecuteWrite()</code> callback is triggered. GattServer handles both
+cases.
+</p>
+
+<p>
+<code>onCharacteristicWriteRequest()</code> first verifies the characteristic being
+written to matches a valid protocol implementation. It stores the UUID of
+the characteristic into <code>deviceCharacteristicMap</code> for the Central device's
+address. Then, it checks <code>writeDataPayload</code> for any previously-stored data
+for the device. If previous data exists, then the new data sent in this
+request is appended to it, and the new value is stored back into
+<code>writeDataPayload</code>.
+</p>
+
+<p>
+If <code>preparedWrite</code> is false, i.e. this is not a long write,
+<code>saveDataReceived()</code> is called. In either case, if <code>responseNeeded</code> is
+true, <code>BluetoothGattServer.sendResponse()</code> is called with a status of
+<code>BluetoothGatt.GATT_SUCCESS</code>.
+</p>
+
+<p>
+<code>saveDataReceived()</code> retrieves the Encounter Message sent by the Central
+device from <code>writeDataPayload</code>, based on the device's address. It then
+consults <code>deviceCharacteristicMap</code> to determine the characteristic that
+was written to, and uses that to determine a suitable protocol
+implementation. The Encounter Message is then processed using
+<code>peripheral.processWriteRequestDataReceived()</code> to yield a
+<i>ConnectionRecord</i> object. The <i>ConnectionRecord</i> is then locally
+broadcasted with an <code>ACTION_RECEIVED_STREETPASS</code> intent; this will be
+received by StreetPassReceiver, documented above. An
+<code>ACTION_DEVICE_PROCESSED</code> intent is also broadcasted, which is received by
+BlacklistReceiver.
+</p>
+
+<p>
+Finally, <code>saveDataReceived()</code> removes the entries associated with this
+device from <code>readPayloadMap</code>, <code>writeDataPayload</code>, and
+<code>deviceCharacteristicMap</code>.
+</p>
+
+<p>
+When a long write is being performed, <code>onExecuteWrite()</code> will eventually
+be triggered. <code>onExecuteWrite()</code> will retrieve the Encounter Message from
+<code>writeDataPayload</code>, just to verify that it is not null. Then it calls
+<code>saveDataReceived()</code>, and <code>BluetoothGattServer.sendResponse()</code> with a
+status of <code>GATT_SUCCESS</code>.
+</p>
+
+<p>
+Finally, the Central device will disconnect, triggering
+<code>onConnectionStateChange()</code> again. This callback will remove the
+associated entry for the device from <code>readPayloadMap</code>. Note that this also
+happens if the connection is severed before the protocol completes.
+</p>
+</div>
+
+<ul class="org-ul">
+<li><a id="org51946be"></a>Bugs in long write implementation<br>
+<div class="outline-text-6" id="text-org51946be">
+<p>
+There are a few minor bugs in the handling of long writes. First, in
+<code>onCharacteristicWriteRequest()</code>, the provided data is always appended to
+the existing data inside <code>writeDataPayload</code>. However, the specification
+indicates that the provided <code>offset</code> argument indicates the offset of the
+sent data, which might not always be at the end of the existing
+data. <code>onCharacteristicWriteRequest()</code> should thus insert the new data at
+the right offset instead.
+</p>
+
+<p>
+<code>onExecuteWrite()</code> also fails to check the value of the <code>execute</code>
+argument, which if false, indicates the write should not proceed. This
+prevents a device from cancelling a long write, as is allowed by the
+specification.
+</p>
+
+<p>
+In practice, neither of these bugs are likely to manifest with
+properly-functioning BlueTrace devices on typical BLE stacks, and even if
+they do, are unlikely to severely impact the functionality of BlueTrace.
+</p>
+</div>
+</li>
+</ul>
+</div>
+
+<div id="outline-container-org556d425" class="outline-5">
+<h5 id="org556d425"><span class="section-number-5">7.4.4.4</span> Teardown</h5>
+<div class="outline-text-5" id="text-7-4-4-4">
+<p>
+StreetPassServer is cleaned up by calling <code>tearDown()</code>. This function
+simply calls <code>GattServer.stop()</code> on the associated GattServer, which calls
+<code>BluetoothGattServer.clearServices()</code> and <code>BluetoothGattServer.close()</code> on
+the underlying BluetoothGattServer object.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org0b44d61" class="outline-4">
+<h4 id="org0b44d61"><span class="section-number-4">7.4.5</span> StreetPassRecordDatabase</h4>
+<div class="outline-text-4" id="text-7-4-5">
+<p>
+StreetPassRecordDatabase (<i>persistence.*</i>) is the database providing
+persistency to StreetPass. Besides the main <i>StreetPassRecordDatabase</i>
+class, there are also a few other classes to represent database-backed
+objects. StreetPassRecordDatabase is implemented using Room, which
+generates the implementation of the database code during compile-time. The
+implementation classes have a suffix of "_Impl".
+</p>
+
+<p>
+StreetPassRecordDatabase is backed by an SQLite3 database file named
+<code>record_database</code>. The database consists of two tables:
+</p>
+
+<ul class="org-ul">
+<li><code>record_table</code>, holding contact tracing records</li>
+<li><code>status_table</code>, holding status messages</li>
+</ul>
+
+<p>
+The status messages stored in <code>status_table</code> are added when
+<code>ACTION_RECEIVED_STATUS</code> intents are received by StatusReceiver in BMS. In
+practice the only status messages that are sent are by StreetPassScanner
+when scanning starts and stops, and are not of much interest, and so we do
+not focus on it in this report.
+</p>
+
+<p>
+<i>StreetPassRecord</i> objects hold the actual contact tracing information,
+and are backed by rows in <code>record_table</code> via the <i>StreetPassRecordDao</i>
+data access object. <i>StreetPassRecord</i> objects were already described in
+Section <a href="#orgcc7d870">7.1.3</a>; we note down the table columns corresponding to each
+property of the object here.
+</p>
+
+
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left"><b>Column</b></th>
+<th scope="col" class="org-left"><b>Property</b></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left"><code>v</code></td>
+<td class="org-left">protocol version</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>org</code></td>
+<td class="org-left">organization code</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>msg</code></td>
+<td class="org-left">TempID of other device</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>modelP</code></td>
+<td class="org-left">device model of Peripheral device</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>modelC</code></td>
+<td class="org-left">device model of Central device</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>rssi</code></td>
+<td class="org-left">RSSI</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>txPower</code></td>
+<td class="org-left">transmission power (might be null)</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>timestamp</code></td>
+<td class="org-left">timestamp</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>id</code></td>
+<td class="org-left">table primary key</td>
+</tr>
+</tbody>
+</table>
+<p>
+<i>StreetPassRecordDao</i> provides the following functions:
+</p>
+
+<ul class="org-ul">
+<li><code>insert()</code>; to insert new StreetPassRecord objects</li>
+<li><code>purgeOldRecords()</code>; to delete old StreetPassRecord objects given a
+timestamp</li>
+<li><code>getCurrentRecords()</code>, <code>getLastRecord()</code>, <code>getMostRecentRecord()</code>,
+<code>getRecords()</code>, <code>getRecordsViaQuery()</code>; to query for StreetPassRecord
+objects stored in the database</li>
+<li><code>countRecordsInRange()</code>, <code>liveCountRecordsInRange()</code>; to count the
+number of StreetPassRecord objects within a certain time period</li>
+<li><code>nukeDb()</code>; to delete all StreetPassRecord objects from the database,
+referred to as nuking the database</li>
+</ul>
+</div>
+
+<div id="outline-container-org6f44c55" class="outline-5">
+<h5 id="org6f44c55"><span class="section-number-5">7.4.5.1</span> StreetPassRecordStorage</h5>
+<div class="outline-text-5" id="text-7-4-5-1">
+<p>
+StreetPassRecordStorage (<i>persistence.StreetPassRecordStorage</i>) is a
+higher-level interface to common database operations. It has the following
+functions:
+</p>
+
+<ul class="org-ul">
+<li><code>getAllRecords()</code>; calls <code>StreetPassRecordDao.getCurrentRecords()</code></li>
+<li><code>nukeDb()</code>; calls <code>StreetPassRecordDao.nukeDb()</code></li>
+<li><code>purgeOldRecords()</code>; calls <code>StreetPassRecordDao.purgeOldRecords()</code></li>
+<li><code>saveRecord()</code>; calls <code>StreetPassRecordDao.insert()</code></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org3eef97b" class="outline-5">
+<h5 id="org3eef97b"><span class="section-number-5">7.4.5.2</span> Data Access Analysis</h5>
+<div class="outline-text-5" id="text-7-4-5-2">
+<p>
+We analyzed the callers of all database access functions in
+<i>StreetPassRecordDao</i>, to determine where the data within the database is
+used. We identified the following operations that access the database:
+</p>
+
+<ul class="org-ul">
+<li><b>Metrics</b>, to determine number of records in a day, and the timestamp of
+the latest record</li>
+<li><b>PeekActivity</b> and <b>PlotActivity</b>, to view records, and to nuke the
+database. These are debug views that are not normally accessible. See
+Section <a href="#orga44452d">7.9</a> for more information.</li>
+<li><b>Upload Service</b>, to extract the records and upload them to the server
+after a successful PIN has been entered. The PIN ensures only a health
+authority will be able to trigger this action.</li>
+<li><b>Home activity</b>, observes when the most recent record changes. Appears to
+be meant to perform an animation whenever a new record is inserted, but
+currently it does not do anything.</li>
+<li><b>Home activity</b>, to update the count of the number of exchanges that have
+occurred on the current day.</li>
+<li><b>StreetPassReceiver</b>, to insert a received record, as elaborated above.</li>
+<li><b>BMS</b>, to purge old records when the <code>ACTION_PURGE</code> <i>Command</i> is processed.</li>
+</ul>
+
+<p>
+Based on our analysis, the only time contact tracing records stored in the
+database are transmitted out of the device is in the uploading service. This
+will only happen after the correct PIN has been entered, which only a
+health authority should have. Thus, contact tracing data in BlueTrace
+should stay private, as expected. Some metadata is sent out via the
+Metrics component, however.
+</p>
+
+<p>
+Note however that the debug activities (<i>PeekActivity</i> and <i>PlotActivity</i>)
+access the contact tracing data. We have not verified if they transmit any
+of that data externally. However, since these activities can typically
+only be accessed by explicitly launching them from a rooted device, this
+is unlikely to pose a privacy risk.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org0b84127" class="outline-5">
+<h5 id="org0b84127"><span class="section-number-5">7.4.5.3</span> SQL Injection Analysis</h5>
+<div class="outline-text-5" id="text-7-4-5-3">
+<p>
+The SQL queries used in StreetPassRecordDatabase are created by Room at
+compile-time. All queries are parameterized, and thus should not lead to
+an SQL injection attack from any attacker-controlled inputs.
+</p>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orge817835" class="outline-3">
+<h3 id="orge817835"><span class="section-number-3">7.5</span> BlueTraceProtocol</h3>
+<div class="outline-text-3" id="text-7-5">
+<p>
+BlueTraceProtocol (<code>protocol.*</code>) is the implementation of the data format
+used to exchange contact tracing records between BlueTrace devices
+(i.e. Encounter Messages). It is used by StreetPass to convert
+<i>ConnectionRecord</i> objects to Encounter Messages and vice versa, when
+sending and receiving data from remote devices.
+</p>
+
+<p>
+BlueTraceProtocol is designed to allow for multiple protocol
+versions. Each version would have its own implementation, as a subclass of
+the parent protocol class <i>BlueTraceProtocol</i>, along with the required
+implementations of <i>CentralInterface</i> and <i>PeripheralInterface</i>, which we
+describe shortly.
+</p>
+
+<p>
+A utility class, <i>BlueTrace</i>, contains several functions that are used to
+retrieve the correct implementation for a particular version.
+</p>
+</div>
+
+<div id="outline-container-orgd6e35d5" class="outline-4">
+<h4 id="orgd6e35d5"><span class="section-number-4">7.5.1</span> BlueTraceProtocol Interface</h4>
+<div class="outline-text-4" id="text-7-5-1">
+<p>
+The parent class <i>BlueTraceProtocol</i> contains the following properties:
+</p>
+
+<ul class="org-ul">
+<li>version of the protocol</li>
+<li>API object for acting as a Central device</li>
+<li>API object for acting as a Peripheral device</li>
+</ul>
+
+<p>
+The two API objects must be implementations of the Kotlin interfaces
+<i>CentralInterface</i> and <i>PeripheralInterface</i> respectively.
+</p>
+
+<p>
+<i>CentralInterface</i> has two methods that must be implemented:
+</p>
+<ul class="org-ul">
+<li><code>prepareWriteRequestData()</code>, generates an Encounter Message containing
+this device's TempID, to be sent to a Peripheral device</li>
+<li><code>processReadRequestDataReceived()</code>, processes the provided Encounter
+Message from a Peripheral device, to generate a <i>ConnectionRecord</i> object</li>
+</ul>
+
+<p>
+<i>PeripheralInterface</i> has two methods that must be implemented:
+</p>
+<ul class="org-ul">
+<li><code>prepareReadRequestData()</code>, generates an Encounter Message containing
+this device's TempID, to be sent to a Central device</li>
+<li><code>processWriteRequestDataReceived()</code>, processes the provided Encounter
+Message from a Central device, to generate a <i>ConnectionRecord</i> object</li>
+</ul>
+
+<p>
+These 4 functions are used in StreetPass to convert between Encounter
+Messages sent/received via GATT, and <i>ConnectionRecord</i> objects.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org2941ca2" class="outline-4">
+<h4 id="org2941ca2"><span class="section-number-4">7.5.2</span> Version 2 Implementation</h4>
+<div class="outline-text-4" id="text-7-5-2">
+<p>
+BlueTrace version 2.0.15 contains only one protocol implementation, for
+version 2 of the BlueTrace protocol (the version described in the white
+paper). This is implemented by classes in the <i>protocol.v2</i> namespace:
+<i>BlueTraceV2</i> is the protocol class, with API objects of
+classes <i>V2Central</i> and <i>V2Peripheral</i>.
+</p>
+
+<p>
+The majority of the work is actually done in two utility classes,
+<i>V2ReadRequestPayload</i> and <i>V2WriteRequestPayload</i> These classes represent
+the version 2 Encounter Messages.
+</p>
+</div>
+
+<div id="outline-container-org19b585a" class="outline-5">
+<h5 id="org19b585a"><span class="section-number-5">7.5.2.1</span> V2ReadRequestPayload</h5>
+<div class="outline-text-5" id="text-7-5-2-1">
+<p>
+<i>V2ReadRequestPayload</i> represents Encounter Messages sent by Peripheral
+devices to Central devices, and contains the same fields: version,
+organization, TempID, and device model.
+</p>
+
+<p>
+The <code>fromPayload()</code> function accepts an Encounter Message in the form of a
+byte array, decodes it as a UTF-8 string, and then uses the Gson library
+to deserialize the string into a <i>V2ReadRequestPayload</i> object.
+</p>
+
+<p>
+The <code>getPayload()</code> function converts a /V2ReadRequestPayloa/d object into an
+Encounter Message in the form of a byte array, by first using Gson to
+serialize the <i>V2ReadRequestPayload</i> into a JSON string, and then UTF-8
+encoding the string.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org9c4a499" class="outline-5">
+<h5 id="org9c4a499"><span class="section-number-5">7.5.2.2</span> V2WriteRequestPayload</h5>
+<div class="outline-text-5" id="text-7-5-2-2">
+<p>
+<i>V2WriteRequestPayload</i> represents Encounter Messages sent by Central
+devices to Peripheral devices, and contains the same fields: version,
+organization, TempID, device model, and RSSI.
+</p>
+
+<p>
+Like <i>V2ReadRequestPayload</i>, it has <code>fromPayload()</code> and <code>getPayload()</code>
+functions that perform equivalent operations, also using Gson and UTF-8
+for encoding and serialization.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org291be3c" class="outline-5">
+<h5 id="org291be3c"><span class="section-number-5">7.5.2.3</span> V2Central and V2Peripheral</h5>
+<div class="outline-text-5" id="text-7-5-2-3">
+<p>
+The implementations of <i>V2Central</i> and <i>V2Peripheral</i> are straightforward.
+</p>
+
+<p>
+<i>V2Central</i> implements the required functions as follows:
+</p>
+
+<ul class="org-ul">
+<li><code>prepareWriteRequestData()</code>: Create a new <i>V2WriteRequestPayload</i> object,
+with TempID set to <code>TracerApp.thisDeviceMsg()</code>, and then call
+<code>V2WriteRequestPayload.getPayload()</code> to convert it into an Encounter
+Message.</li>
+
+<li><code>processReadRequestDataReceived()</code>: Deserialize an Encounter message into a
+<i>V2ReadRequestPayload</i> object using
+<code>V2ReadRequestPayload.fromPayload()</code>, and then create a
+<i>ConnectionRecord</i> using the fields from the <i>V2ReadRequestPayload</i>
+object.</li>
+</ul>
+
+<p>
+V2Peripheral implements the required functions as follows:
+</p>
+
+<ul class="org-ul">
+<li><code>prepareReadRequestData()</code>: Create a new <i>V2ReadRequestPayload</i> object,
+with TempID set to <code>TracerApp.thisDeviceMsg()</code>, and then call
+<code>V2ReadRequestPayload.getPayload()</code> to convert it into an Encounter
+Message.</li>
+
+<li><code>processWriteRequestDataReceived()</code>: Deserialize an Encounter Message
+into a <i>V2WriteRequestPayload</i> object using
+<code>V2WriteRequestPayload.fromPayload()</code>, and then create a
+<i>ConnectionRecord</i> using the fields from the <i>V2WriteRequestPayload</i> object.</li>
+</ul>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org67db5ff" class="outline-4">
+<h4 id="org67db5ff"><span class="section-number-4">7.5.3</span> Protocol Selection</h4>
+<div class="outline-text-4" id="text-7-5-3">
+<p>
+BlueTraceProtocol contains a protocol selection class named <i>BlueTrace</i>
+that is used to retrieve the correct protocol implementation given a
+characteristic UUID. For the sake of clarity, we will refer to this
+<i>BlueTrace</i> class as the "protocol selector".
+</p>
+
+<p>
+As per the BlueTrace protocol design, each version of the protocol will
+use a unique UUID value for the characteristic to be read and written via
+GATT (see <a href="#orgf8551ae">7.4</a> for more details). The protocol selector maintains a
+mapping from characteristic UUID values to protocol versions, in
+<code>characteristicToProtocolVersionMap</code>; and another mapping from versions to
+implementations, in <code>implementations</code>.
+</p>
+
+<p>
+<code>characteristicToProtocolVersionMap</code> is statically set to contain a single
+entry, mapping the UUID 117BDD58-57CE-4E7A-8E87-7CCCDDA2A804 to version 2.
+</p>
+
+<p>
+<code>implementations=</code> is statically set to contain a single entry, mapping
+version 2 to a <i>BlueTraceV2</i> object.
+</p>
+
+<p>
+The function <code>getImplementation()</code> is used by StreetPass to retrieve an
+appropriate protocol implementation given a UUID. It does this by looking
+up the two maps. Due to the values of the map, this means that it will
+only handle the UUID 117BDD58-57CE-4E7A-8E87-7CCCDDA2A804, and return the
+<i>BlueTraceV2</i> object.
+</p>
+
+<p>
+The function <code>supprtsCharUUID()</code> is used by StreetPass to check if there
+is an implementation to support a given UUID. It does this by looking up
+<code>characteristicToProtocolVersionMap</code>, and thus will only return true when
+the UUID is 117BDD58-57CE-4E7A-8E87-7CCCDDA2A804.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgda8bfc2" class="outline-3">
+<h3 id="orgda8bfc2"><span class="section-number-3">7.6</span> Metrics</h3>
+<div class="outline-text-3" id="text-7-6">
+<p>
+BlueTrace contains a Metrics component (<i>metrics.*</i>) that periodically gathers
+statistics about contact tracing. The main class is <i>Metrics</i>.
+</p>
+
+<p>
+A <i>Metrics</i> object is created in two other components: TempIDManager when
+new TempIDs are downloaded from the server, and FCMService, when a
+<i>RemoteMessage</i> has a payload containing they key "purpose". In both
+cases, <code>Metrics.upload()</code> is called immediately after creating the Metrics
+object.
+</p>
+
+<p>
+<i>Metrics</i> objects gather data during construction, and also when
+<code>upload()</code> is called. This is the data gathered by the class:
+</p>
+
+<ul class="org-ul">
+<li>platform name (hardcoded to "android" for the version we are looking at)</li>
+<li>app version</li>
+<li>current timestamp</li>
+<li>TTID, taken from preferences</li>
+<li>whether the <code>ACCESS_FINE_LOCATION</code> permission has been granted</li>
+<li>whether notifications are enabled</li>
+<li>count of number of contact tracing records collected over the previous day</li>
+<li>timestamp of the latest contact tracing record in the database</li>
+</ul>
+
+<p>
+After gathering the above information, <code>upload()</code> serializes it into a
+JSON string. It then makes a Firebase function call <code>sendHeartbeat()</code>, on
+the instance "asia-east2", with the JSON string as the argument. This will
+upload the gathered data to the remote server.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orga65ccb9" class="outline-3">
+<h3 id="orga65ccb9"><span class="section-number-3">7.7</span> FCMService</h3>
+<div class="outline-text-3" id="text-7-7">
+<p>
+FCMService (<i>services.FCMService</i>) is a top-level service for handling
+messages sent via Firebase Cloud Messaging (FCM). It is a subclass of
+<i>FirebaseMessagingService</i>
+(<i>com.google.firebase.messaging.FirebaseMessagingService</i>) and is defined
+as a service in <code>AndroidManifest.xml</code> to handle
+<code>com.google.firebase.MESSAGING_EVENT</code> intents.
+</p>
+
+<p>
+Messages sent via FCM are processed by the
+<code>FCMService.onMessageReceived()</code> function. <code>onMessageReceived()</code> will
+inspect the <i>RemoteMessage</i>
+(<i>com.google.firebase.messaging.RemoteMessage</i>) argument, and perform
+various actions based on the attached payload data, which is in the form
+of a map.
+</p>
+
+<p>
+If the payload contains the key "body", then the value associated with
+"body" is used to set the <code>ANNOUNCEMENT</code> preference. This announcement
+appears on the home activity.
+</p>
+
+<p>
+If the payload contains the key "command", the value associated with
+"command" is converted into an integer, and used as a <i>Command</i> index. BMS
+is started using <code>Context.startService()</code>, with an intent that has
+<code>COMMAND_KEY</code> set to the <i>Command</i> index. This allows a remote message to
+trigger BMS to process a chosen <i>Command</i>, such as <code>ACTION_SCAN</code>.
+</p>
+
+<p>
+If the payload contains the key "purpose", then a new Metrics object is
+created and <code>Metrics.upload()</code> is called, which will upload contact
+tracing metrics to the server.
+</p>
+
+<p>
+Finally, if a notification is attached to the <i>RemoteMessage</i>, it will be
+displayed.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org20c92a0" class="outline-3">
+<h3 id="org20c92a0"><span class="section-number-3">7.8</span> User Registration</h3>
+<div class="outline-text-3" id="text-7-8">
+<p>
+When a new user installs BlueTrace on their device, they must go through a
+registration step where personal details are gathered and then used to
+register a new account. The core logic is part of the UI code, and is in
+the <i>onboarding.newOnboard.register.*</i> namespace.
+</p>
+
+<p>
+The exact personal information that is gathered depends on the method by
+which the user wishes to register: for example they can use their NRIC, or
+a passport number. In all cases, a contact phone number is also required.
+</p>
+
+<p>
+After the UI gathers and validates the required data from the user, it
+will create a <i>RegisterUserData</i> object containing the personal
+information. This object is then passed to the function
+<code>Utils.registerUserInfo()</code>, which performs the actual registration.
+</p>
+
+<p>
+<code>registerUserInfo()</code> makes a Firebase function call <code>updateUserInfo</code>,
+providing the <i>RegisterUserData</i> object serialized using JSON. If the call
+succeeds, <code>registerUserInfo()</code> extracts the value <code>ttId</code> from the returned
+result. This is the user's TTID, and is stored into the preference <code>TTID</code>.
+</p>
+
+<p>
+Next, the <i>RegisterUserData</i> object is saved in an encrypted form, by
+calling <code>Preference.saveEncryptedUserData()</code>. On modern Android versions,
+this function ultimately uses Android's Keystore system to encrypt a
+JSON-serialized version of <i>RegisterUserData</i> using a secret key protected
+by the Keystore (the secret key has alias "USER_DATA"). The encryption
+algorithm used is AES-GCM. The encrypted data is then stored in the
+preference <code>ENCRYPTED_USER_DATA</code>.
+</p>
+
+<p>
+Similarly, the contact phone number provided by the user is encrypted
+using a key with alias "PHONE_NUMBER_KEY", and then stored in the
+preference <code>ENCRYPTED_PHONE_NUMBER</code>.
+</p>
+
+<p>
+At this point the user registration process is completed.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orga44452d" class="outline-3">
+<h3 id="orga44452d"><span class="section-number-3">7.9</span> Debug Activities</h3>
+<div class="outline-text-3" id="text-7-9">
+<p>
+BlueTrace contains two "hidden" activities, which can be found in
+<code>AndroidManifest.xml</code>, but are not normally accessible via the
+UI. <i>PeekActivity</i> displays a list of all contact tracing records in the
+database, while <i>PlotActivity</i> displays a few graphs showing contact
+tracing statistics. These appear to be for debugging purposes.
+</p>
+
+<p>
+OpenTrace contains the same activities, and inspecting OpenTrace's code
+reveals that they can be accessed from the UI by tapping twice on the top
+animation of the home activity, if <code>BuildConfig.DEBUG</code> is set to true. The
+version of BlueTrace available in the Play Store is not a debug version,
+and thus the trigger code is missing.
+</p>
+
+<p>
+PeekActivity and PlotActivity can be started manually, however, if
+BlueTrace is running on a rooted device. By issuing the <code>am</code> command with
+root privileges via <i>adb</i>, arbitrary activities in apps can be started, even
+if they are not marked exported in <code>AndroidManifest.xml</code>, as is the case
+with PeekActivity and PlotActivity. For example, the command below will
+start PeekActivity:
+</p>
+
+<pre class="example">
+device:/ # am start -n \
+&gt; sg.gov.tech.bluetrace/sg.gov.tech.bluetrace.PeekActivity
+</pre>
+
+<p>
+The two activities may not be fully functional as they are not meant to
+run on non-debug builds; some code may be missing due to the
+<code>BuildConfig.DEBUG</code> flag. We have not explored their features in detail.
+</p>
+
+<p>
+As PeekActivity and PlotActivity can only be launched on rooted devices,
+via an <i>adb</i> connection, they are unlikely to pose any kind of privacy or
+security risk.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgfba7667" class="outline-3">
+<h3 id="orgfba7667"><span class="section-number-3">7.10</span> Use of Firebase in BlueTrace</h3>
+<div class="outline-text-3" id="text-7-10">
+<p>
+BlueTrace makes use of the Firebase platform for cloud
+operations. All data exchanged between the BlueTrace app and the remote
+server happen via Firebase services, with namespace
+<i>com.google.firebase.*</i>.
+</p>
+
+<p>
+Firebase Authentication (<code>auth.*</code>) is used for user registration and
+identification. We did not explore this component in detail.
+</p>
+
+<p>
+Firebase Cloud Functions (<i>functions.*</i>) is used to send and receive data
+from the server via remote procedure calls. For example, BlueTrace uses
+this to download new TempIDs in TempIDManager. It is also used during new
+user registration, when uploading metrics information, and when uploading
+contact tracing data upon request by a health authority. We examined all
+places in BlueTrace where Firebase cloud functions were called, and
+verified that none of them appear to send anything unusual.
+</p>
+
+<p>
+Firebase Cloud Messaging (<code>messaging.*</code>) is used to send notifications and
+other kinds of messages from the server. This is described in more detail
+in Section <a href="#orga65ccb9">7.7</a>.
+</p>
+
+<p>
+Firebase Analytics is an analytics service that sends analytics
+information back to the server. We examined all places in BlueTrace where
+analytics information is transmitted, and determined that all the
+information sent is harmless: mainly error messages that do not contain
+any personal information.
+</p>
+</div>
+</div>
+</div>
+
+
+<div id="outline-container-orge1adb53" class="outline-2">
+<h2 id="orge1adb53"><span class="section-number-2">8</span> Analysis of BlueTrace 2.1.4</h2>
+<div class="outline-text-2" id="text-8">
+<p>
+We performed a quick differential analysis of BlueTrace 2.1.4 to
+determine what changes were made since the version we analyzed in detail,
+2.0.15. We disassembled the APKs of versions 2.0.15 and 2.1.4 into
+<i>smali</i> files using <i>apktool</i>, and performed a diff of the two code
+bases. In general, our findings remain the same for 2.1.4.
+</p>
+
+<p>
+The following are the differences we found between the two code bases.
+</p>
+</div>
+
+<div id="outline-container-org363d9ca" class="outline-3">
+<h3 id="org363d9ca"><span class="section-number-3">8.1</span> SafeEntry Support</h3>
+<div class="outline-text-3" id="text-8-1">
+<p>
+SafeEntry is a visitor check-in system developed by GovTech that keeps
+track of an individual's entry and exit of particular location. In
+Singapore, it is currently mandatory to use SafeEntry when visiting public
+places such as shopping malls, restaurants and offices. Users can check-in
+and check-out of SafeEntry by scanning a QR code to access a URL, and
+filling up the form on the website at that URL. Users must supply
+identifying information such as their NRIC number. A central server stores
+the check-in and check-out records.
+</p>
+
+<p>
+BlueTrace 2.1.4 has a new feature allowing it to manage SafeEntry
+check-ins. It includes a QR code scanner, and a backend that calls
+Firebase functions to convert the scanned URL into information used for
+checking in, and to perform the actual check-in and check-out.
+</p>
+
+<p>
+A successful check-in or check-out eventually gets stored on disk, in the
+same database used for StreetPass records (<code>record_database</code>). The entries
+are stored in the table <code>safe_entry_table</code>, and include information about
+the location visited, with check-in and check-out time.
+</p>
+
+<p>
+SafeEntry support appears to be disabled if the user account is registered
+using a passport number.
+</p>
+</div>
+
+<div id="outline-container-orgc9d8116" class="outline-4">
+<h4 id="orgc9d8116"><span class="section-number-4">8.1.1</span> Privacy Impact</h4>
+<div class="outline-text-4" id="text-8-1-1">
+<p>
+As BlueTrace stores SafeEntry records on disk, an attacker with privileged
+access to BlueTrace (like Dan from Section <a href="#org77792e0">5.2.11</a>) would be
+able to determine all the locations visited by the user. SafeEntry records
+are purged every 25 days <sup><a id="fnr.11" class="footref" href="#fn.11">11</a></sup>, so there would be up to 25 days worth of check-ins exposed.
+</p>
+
+<p>
+However, most people using SafeEntry without BlueTrace would load the
+SafeEntry URL into their web browser. This URL would then be logged in the
+browser's history. The URL itself contains enough information to infer the
+location visited by the user. Thus, unless the user takes care to clear
+their browser history of SafeEntry URLs, or uses some alternate setup to
+access the SafeEntry URLs without having them being logged, the relative
+loss of privacy from using BlueTrace's SafeEntry feature is minimal.
+</p>
+
+<p>
+Since SafeEntry by design involves logging an individual's access to a
+location to a central server, there is no privacy impact from BlueTrace
+contacting the Firebase server to process check-ins and check-outs. The
+Firebase calls do end up linking the user's TTID with the SafeEntry
+records, however, but such a link already exists since both BlueTrace and
+SafeEntry systems would have common identifying information about an
+individual, such as their NRIC.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org062fa95" class="outline-3">
+<h3 id="org062fa95"><span class="section-number-3">8.2</span> LightLifter</h3>
+<div class="outline-text-3" id="text-8-2">
+<p>
+BlueTrace includes a new component known as LightLifter
+(<i>services.light.*</i>). This appears to be a simple service that manages
+routine scheduled tasks. It is started in <code>BMS.onCreate()</code>, and uses
+Android's WorkManager (<i>androidx.work.WorkManager</i>) to schedule two
+repeating tasks:
+</p>
+
+<ul class="org-ul">
+<li>Collect and upload metrics every 6 hours</li>
+<li>Purge old records every 12 hours</li>
+</ul>
+
+<p>
+The metrics upload task is identical to what is described in Section
+<a href="#orgbdaec54">2.2.2</a>. In 2.0.15, metric uploading happened after TempIDManager
+completed downloading new TempIDs from the server, which would happen
+roughly every 12 hours. Thus this new feature would cause metrics to be
+uploaded more frequently.
+</p>
+
+<p>
+The purge task works similarly to the <code>ACTION_PURGE</code> <i>Command</i> in 2.0.15. It
+calls the <code>purgeOldRecords()</code> functions on the three data stores:
+StreetPassRecordStorage, StatusRecordStorage, and the new
+SafeEntryRecordstorage. However, unlike in 2.0.15, purging happens once
+every 25 days, and not 21 days. We are unsure why the purge interval was
+changed.
+</p>
+
+<p>
+Since LightLifter performs the database purging, the code relating to the
+<code>ACTION_PURGE</code> <i>Command</i> was removed from BluetoothMonitoringService: BMS no
+longer processes <code>ACTION_PURGE</code> <i>Commands</i>, and does not schedule intents
+related to <code>ACTION_PURGE</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org3744fc5" class="outline-3">
+<h3 id="org3744fc5"><span class="section-number-3">8.3</span> Miscellaneous</h3>
+<div class="outline-text-3" id="text-8-3">
+<p>
+BlueTrace 2.1.4 also includes another native library,
+<code>libpl_droidsonroids_gif.so</code>. This appears to be used only to render a GIF
+animation that is shown after upgrading.
+</p>
+
+<p>
+The Play Store "what's new" entry for version 2.1 suggests that the update
+allows Android devices to contact iOS devices that have BlueTrace running
+in the background. However we did not notice any changes to the code
+relating to BLE. As such we are unsure what this comment refers to.
+</p>
+</div>
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" class="footnum" href="#fnr.1">1</a></sup> <div class="footpara"><p class="footpara"><a href="https://play.google.com/store/apps/details?id=sg.gov.tech.bluetrace">https://play.google.com/store/apps/details?id=sg.gov.tech.bluetrace</a></p></div></div>
+
+<div class="footdef"><sup><a id="fn.2" class="footnum" href="#fnr.2">2</a></sup> <div class="footpara"><p class="footpara">Version
+2.1 includes a native library to render a GIF animation shown after
+upgrading.</p></div></div>
+
+<div class="footdef"><sup><a id="fn.3" class="footnum" href="#fnr.3">3</a></sup> <div class="footpara"><p class="footpara"><a href="https://support.tracetogether.gov.sg/hc/en-sg/articles/360043735693-What-data-is-collected-Are-you-able-to-see-my-personal-data">https://support.tracetogether.gov.sg/hc/en-sg/articles/360043735693-What-data-is-collected-Are-you-able-to-see-my-personal-data</a>-</p></div></div>
+
+<div class="footdef"><sup><a id="fn.4" class="footnum" href="#fnr.4">4</a></sup> <div class="footpara"><p class="footpara">This has changed to 25 days as of BlueTrace 2.1.4.</p></div></div>
+
+<div class="footdef"><sup><a id="fn.5" class="footnum" href="#fnr.5">5</a></sup> <div class="footpara"><p class="footpara">Or more precisely, an individual's risk of being
+surveilled is already high, with or without BlueTrace.</p></div></div>
+
+<div class="footdef"><sup><a id="fn.6" class="footnum" href="#fnr.6">6</a></sup> <div class="footpara"><p class="footpara">This has been removed as per
+BlueTrace 2.1.4, as the purge task has been moved to LightLifter. Please
+see Section <a href="#orge1adb53">8</a> for more details.</p></div></div>
+
+<div class="footdef"><sup><a id="fn.7" class="footnum" href="#fnr.7">7</a></sup> <div class="footpara"><p class="footpara">The
+manufacturer-specific data appears to be set for the use of iOS BlueTrace
+devices.</p></div></div>
+
+<div class="footdef"><sup><a id="fn.8" class="footnum" href="#fnr.8">8</a></sup> <div class="footpara"><p class="footpara">This has been removed
+as per BlueTrace 2.1.4, as the purge task has been moved to
+LightLifter. Please see Section <a href="#orge1adb53">8</a> for more
+details.</p></div></div>
+
+<div class="footdef"><sup><a id="fn.9" class="footnum" href="#fnr.9">9</a></sup> <div class="footpara"><p class="footpara">BlueTrace for
+Android appears to send advertisement packets with manufacturer-specific
+data for manufacturer ID <code>0x3ff</code> in order to overcome some limitations
+with the iOS implementation.</p></div></div>
+
+<div class="footdef"><sup><a id="fn.10" class="footnum" href="#fnr.10">10</a></sup> <div class="footpara"><p class="footpara">In the version of BlueTrace
+we are analyzing, there is only one protocol implementation,
+<i>BlueTraceV2</i>, and it only handles the characteristic with UUID
+117BDD58-57CE-4E7A-8E87-7CCCDDA2A804, which is what is expected. See
+Section <a href="#orge817835">7.5</a> for more details.)</p></div></div>
+
+<div class="footdef"><sup><a id="fn.11" class="footnum" href="#fnr.11">11</a></sup> <div class="footpara"><p class="footpara">BlueTrace 2.1.4 introduced a new component,
+LightLifter, which handles record purging, and the purge interval is set
+to 25 days.</p></div></div>
+
+
+</div>
+</div></div>
+</body>
+</html>
