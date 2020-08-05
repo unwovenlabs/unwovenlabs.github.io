@@ -1,12 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- 2020-08-05 Wed 12:17 -->
+<!-- 2020-08-05 Wed 12:24 -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Static Analysis of TraceTogether for Android</title>
 <meta name="generator" content="Org mode">
 <meta name="author" content="Zhuang Xinyu, Principal Researcher (xinyu@unwovenlabs.com)">
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-174451627-1"></script>
+<script>
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'UA-174451627-1');
+</script>
 <link rel="stylesheet" type="text/css" href="report.css" />
 <script src="report.js"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -63,8 +71,8 @@ for the JavaScript code in this tag.
 <div id="author">zerotypic (zerotypic@gmail.com)</div>
 <div id="toc" style="visibility: hidden"></div>
 
-<div id="outline-container-orgf06ba6f" class="outline-2">
-<h2 id="orgf06ba6f"><span class="section-number-2">1</span> Introduction</h2>
+<div id="outline-container-orgc02132a" class="outline-2">
+<h2 id="orgc02132a"><span class="section-number-2">1</span> Introduction</h2>
 <div class="outline-text-2" id="text-1">
 <p>
 TraceTogether is a COVID-19 contact tracing mobile application developed
@@ -115,22 +123,22 @@ would install and use on their phone.
 <p>
 A newer version, 2.1.4, was released after we had completed most of our
 analysis. We performed a differential analysis of the latest version and
-present our findings in Section <a href="#orge1adb53">8</a>.
+present our findings in Section <a href="#orgf3dabce">8</a>.
 </p>
 </div>
 </div>
 
 
-<div id="outline-container-org66f22f2" class="outline-2">
-<h2 id="org66f22f2"><span class="section-number-2">2</span> Summary of Findings</h2>
+<div id="outline-container-org6be221f" class="outline-2">
+<h2 id="org6be221f"><span class="section-number-2">2</span> Summary of Findings</h2>
 <div class="outline-text-2" id="text-2">
 <p>
 We present a summary of our key findings here for ease of reference.
 </p>
 </div>
 
-<div id="outline-container-org802c4c0" class="outline-3">
-<h3 id="org802c4c0"><span class="section-number-3">2.1</span> BlueTrace and OpenTrace</h3>
+<div id="outline-container-org9cf02fb" class="outline-3">
+<h3 id="org9cf02fb"><span class="section-number-3">2.1</span> BlueTrace and OpenTrace</h3>
 <div class="outline-text-3" id="text-2-1">
 <p>
 BlueTrace and OpenTrace are largely similar and appear to be descended
@@ -141,8 +149,8 @@ features that we describe shortly.
 </div>
 </div>
 
-<div id="outline-container-org65599a2" class="outline-3">
-<h3 id="org65599a2"><span class="section-number-3">2.2</span> Privacy</h3>
+<div id="outline-container-org41a93ae" class="outline-3">
+<h3 id="org41a93ae"><span class="section-number-3">2.2</span> Privacy</h3>
 <div class="outline-text-3" id="text-2-2">
 <p>
 BlueTrace generally respects privacy, and keeps to its word on what data
@@ -153,8 +161,8 @@ registration phase.
 </p>
 </div>
 
-<div id="outline-container-org2accf1f" class="outline-4">
-<h4 id="org2accf1f"><span class="section-number-4">2.2.1</span> TempIDs</h4>
+<div id="outline-container-org19de257" class="outline-4">
+<h4 id="org19de257"><span class="section-number-4">2.2.1</span> TempIDs</h4>
 <div class="outline-text-4" id="text-2-2-1">
 <p>
 BlueTrace uses TempIDs as a means of preserving privacy while exchanging
@@ -174,13 +182,13 @@ is in clear, and an attacker with privileged access to BlueTrace would be
 able to read it. Such an attacker would thus be able to associate the user
 to the TempIDs. However, since this attack would require some form of
 compromise of the BlueTrace client, its impact is low. Please see Section
-<a href="#orgb535fd5">5.2.6</a> for more information.
+<a href="#orgad20f94">5.2.6</a> for more information.
 </p>
 </div>
 </div>
 
-<div id="outline-container-orgbdaec54" class="outline-4">
-<h4 id="orgbdaec54"><span class="section-number-4">2.2.2</span> Metrics</h4>
+<div id="outline-container-orge32d37c" class="outline-4">
+<h4 id="orge32d37c"><span class="section-number-4">2.2.2</span> Metrics</h4>
 <div class="outline-text-4" id="text-2-2-2">
 <p>
 BlueTrace contains a component that collects statistics and periodically
@@ -210,8 +218,8 @@ in an area with more people.
 </div>
 </div>
 
-<div id="outline-container-orgb3ee8b3" class="outline-4">
-<h4 id="orgb3ee8b3"><span class="section-number-4">2.2.3</span> Pause Feature</h4>
+<div id="outline-container-org0188800" class="outline-4">
+<h4 id="org0188800"><span class="section-number-4">2.2.3</span> Pause Feature</h4>
 <div class="outline-text-4" id="text-2-2-3">
 <p>
 BlueTrace has a pause feature that allows a user to manually pause contact
@@ -223,8 +231,8 @@ privacy.
 </div>
 </div>
 
-<div id="outline-container-orgdee44e7" class="outline-4">
-<h4 id="orgdee44e7"><span class="section-number-4">2.2.4</span> Remote Command Activation</h4>
+<div id="outline-container-orgdcac11a" class="outline-4">
+<h4 id="orgdcac11a"><span class="section-number-4">2.2.4</span> Remote Command Activation</h4>
 <div class="outline-text-4" id="text-2-2-4">
 <p>
 BlueTrace's FCMService component allows the central server to remotely
@@ -239,8 +247,8 @@ BlueTrace app.
 </div>
 </div>
 
-<div id="outline-container-orga57b9ba" class="outline-3">
-<h3 id="orga57b9ba"><span class="section-number-3">2.3</span> Security</h3>
+<div id="outline-container-org396892f" class="outline-3">
+<h3 id="org396892f"><span class="section-number-3">2.3</span> Security</h3>
 <div class="outline-text-3" id="text-2-3">
 <p>
 BlueTrace appears to be written securely. We traced the flow of data from
@@ -263,8 +271,8 @@ security impact.
 </div>
 </div>
 
-<div id="outline-container-orgb552346" class="outline-3">
-<h3 id="orgb552346"><span class="section-number-3">2.4</span> BlueTrace version 2.1.4</h3>
+<div id="outline-container-org7d13bbb" class="outline-3">
+<h3 id="org7d13bbb"><span class="section-number-3">2.4</span> BlueTrace version 2.1.4</h3>
 <div class="outline-text-3" id="text-2-4">
 <p>
 We performed a quick analysis of the latest version of BlueTrace,
@@ -284,8 +292,8 @@ SafeEntry.
 </div>
 </div>
 
-<div id="outline-container-org8e2e290" class="outline-3">
-<h3 id="org8e2e290"><span class="section-number-3">2.5</span> Conclusion</h3>
+<div id="outline-container-orgb5063ca" class="outline-3">
+<h3 id="orgb5063ca"><span class="section-number-3">2.5</span> Conclusion</h3>
 <div class="outline-text-3" id="text-2-5">
 <p>
 BlueTrace is generally respectful of a user's privacy, with only one minor
@@ -297,8 +305,8 @@ to have any significant security flaws, and only a few minor bugs.
 </div>
 
 
-<div id="outline-container-org85c8b12" class="outline-2">
-<h2 id="org85c8b12"><span class="section-number-2">3</span> Research Setup</h2>
+<div id="outline-container-org6206a83" class="outline-2">
+<h2 id="org6206a83"><span class="section-number-2">3</span> Research Setup</h2>
 <div class="outline-text-2" id="text-3">
 <p>
 We downloaded BlueTrace version 2.0.15 from Google Play Store <sup><a id="fnr.1" class="footref" href="#fn.1">1</a></sup> using
@@ -346,8 +354,8 @@ the OpenTrace GitHub repository (commit 7e0cdd8).
 </div>
 
 
-<div id="outline-container-orgd10b859" class="outline-2">
-<h2 id="orgd10b859"><span class="section-number-2">4</span> Architectural Overview</h2>
+<div id="outline-container-orgac6c05d" class="outline-2">
+<h2 id="orgac6c05d"><span class="section-number-2">4</span> Architectural Overview</h2>
 <div class="outline-text-2" id="text-4">
 <p>
 The main purpose of BlueTrace is to disseminate and collect contact
@@ -383,7 +391,7 @@ disable BlueTrace if so.</li>
 
 <p>
 The implementation of the above services are described in detail in
-Section <a href="#orgb1f5fc8">7</a>, except for the uploading service, which we
+Section <a href="#org6b9693a">7</a>, except for the uploading service, which we
 did not analyze for this report.
 </p>
 
@@ -400,8 +408,8 @@ are relative to this namespace.
 </p>
 </div>
 
-<div id="outline-container-org5392f94" class="outline-3">
-<h3 id="org5392f94"><span class="section-number-3">4.1</span> Bluetooth Terminology</h3>
+<div id="outline-container-org88f80ca" class="outline-3">
+<h3 id="org88f80ca"><span class="section-number-3">4.1</span> Bluetooth Terminology</h3>
 <div class="outline-text-3" id="text-4-1">
 <p>
 BlueTrace devices communicate via Bluetooth Low Energy (BLE). In BLE
@@ -424,8 +432,8 @@ between each other.
 </div>
 </div>
 
-<div id="outline-container-org2e958dd" class="outline-3">
-<h3 id="org2e958dd"><span class="section-number-3">4.2</span> User Identifiers</h3>
+<div id="outline-container-orgb8f8914" class="outline-3">
+<h3 id="orgb8f8914"><span class="section-number-3">4.2</span> User Identifiers</h3>
 <div class="outline-text-3" id="text-4-2">
 <p>
 As described in the white paper, a BlueTrace device sends temporary
@@ -449,19 +457,19 @@ it effectively functions as a permanent identifier of that user.
 </div>
 </div>
 
-<div id="outline-container-org6526cba" class="outline-2">
-<h2 id="org6526cba"><span class="section-number-2">5</span> Findings</h2>
+<div id="outline-container-org28b746c" class="outline-2">
+<h2 id="org28b746c"><span class="section-number-2">5</span> Findings</h2>
 <div class="outline-text-2" id="text-5">
 <p>
 In this section, we describe our analysis of BlueTrace from privacy and
 security angles. The findings presented here are based on and reference
 our detailed investigation into the inner workers of BlueTrace, which we
-describe in Section <a href="#orgb1f5fc8">7</a>.
+describe in Section <a href="#org6b9693a">7</a>.
 </p>
 </div>
 
-<div id="outline-container-org0934474" class="outline-3">
-<h3 id="org0934474"><span class="section-number-3">5.1</span> Similarity to OpenTrace</h3>
+<div id="outline-container-org0586418" class="outline-3">
+<h3 id="org0586418"><span class="section-number-3">5.1</span> Similarity to OpenTrace</h3>
 <div class="outline-text-3" id="text-5-1">
 <p>
 BlueTrace appears to be largely similar to OpenTrace. The main
@@ -497,8 +505,8 @@ have these additional features.</li>
 </div>
 </div>
 
-<div id="outline-container-orgfb1cbda" class="outline-3">
-<h3 id="orgfb1cbda"><span class="section-number-3">5.2</span> Privacy</h3>
+<div id="outline-container-orgfead765" class="outline-3">
+<h3 id="orgfead765"><span class="section-number-3">5.2</span> Privacy</h3>
 <div class="outline-text-3" id="text-5-2">
 <p>
 A major concern surrounding BlueTrace is to what extent it affects the
@@ -568,8 +576,8 @@ BlueTrace does); our goal is to purely to verify the above guarantees.
 </p>
 </div>
 
-<div id="outline-container-org9a2aedd" class="outline-4">
-<h4 id="org9a2aedd"><span class="section-number-4">5.2.1</span> Source vs sink analysis</h4>
+<div id="outline-container-orgb1ca0cc" class="outline-4">
+<h4 id="orgb1ca0cc"><span class="section-number-4">5.2.1</span> Source vs sink analysis</h4>
 <div class="outline-text-4" id="text-5-2-1">
 <p>
 When analyzing the flow of privacy-related information through a system,
@@ -584,21 +592,21 @@ anywhere it should not.
 </div>
 </div>
 
-<div id="outline-container-org340f5b1" class="outline-4">
-<h4 id="org340f5b1"><span class="section-number-4">5.2.2</span> Firebase security</h4>
+<div id="outline-container-orgb4d4f2f" class="outline-4">
+<h4 id="orgb4d4f2f"><span class="section-number-4">5.2.2</span> Firebase security</h4>
 <div class="outline-text-4" id="text-5-2-2">
 <p>
 BlueTrace makes use of Firebase for cloud operations. In this report, we
 assume the Firebase transport layer is secure from man-in-the-middle
 attacks, i.e. any data sent between the app and the remote server via 
-Firebase cannot be eavesdropped or modified, except in Section <a href="#org77792e0">5.2.11</a> where we consider the impact of an attacker that is able to
+Firebase cannot be eavesdropped or modified, except in Section <a href="#org6f6b168">5.2.11</a> where we consider the impact of an attacker that is able to
 eavesdrop on Firebase traffic.
 </p>
 </div>
 </div>
 
-<div id="outline-container-org1b05a40" class="outline-4">
-<h4 id="org1b05a40"><span class="section-number-4">5.2.3</span> Identification and contact details</h4>
+<div id="outline-container-org9b0eb0f" class="outline-4">
+<h4 id="org9b0eb0f"><span class="section-number-4">5.2.3</span> Identification and contact details</h4>
 <div class="outline-text-4" id="text-5-2-3">
 <p>
 Identification and contact details are gathered from the user during the
@@ -608,7 +616,7 @@ passport number.
 </p>
 
 <p>
-As we describe in Section <a href="#org20c92a0">7.8</a>, once identification
+As we describe in Section <a href="#orgd00b580">7.8</a>, once identification
 information is collected, BlueTrace will send the information to the
 server via a Firebase function call. At this point, we assume the data is
 safely stored on the server end; analysis of the server infrastructure is
@@ -648,15 +656,15 @@ identity.
 </div>
 </div>
 
-<div id="outline-container-org2bacf18" class="outline-4">
-<h4 id="org2bacf18"><span class="section-number-4">5.2.4</span> Contact tracing records</h4>
+<div id="outline-container-org9d7e5f8" class="outline-4">
+<h4 id="org9d7e5f8"><span class="section-number-4">5.2.4</span> Contact tracing records</h4>
 <div class="outline-text-4" id="text-5-2-4">
 <p>
 We verified that contact tracing records received by BlueTrace stay on the
 device and do not get transmitted to any remote location. When BlueTrace
 receives a contact tracing record, it processes it, and then saves it into
 an SQLite database <code>record_database</code>. As described in Section
-<a href="#org0b44d61">7.4.5</a> (Data Access Analysis), the only time contact
+<a href="#org09ef796">7.4.5</a> (Data Access Analysis), the only time contact
 tracing records are accessed from this database and transmitted out of the
 device is after contact tracing has been initiated. Thus, contact tracing
 records do not get uploaded to the server or anywhere else in normal use.
@@ -664,13 +672,13 @@ records do not get uploaded to the server or anywhere else in normal use.
 
 <p>
 Metadata related to the contact tracing data is transmitted however, which
-we will discuss in Section <a href="#org5fbe6a3">5.2.8</a>.
+we will discuss in Section <a href="#org2b49ead">5.2.8</a>.
 </p>
 </div>
 </div>
 
-<div id="outline-container-orgfe9ec08" class="outline-4">
-<h4 id="orgfe9ec08"><span class="section-number-4">5.2.5</span> TempIDs as a form of personal information</h4>
+<div id="outline-container-org1b1bcec" class="outline-4">
+<h4 id="org1b1bcec"><span class="section-number-4">5.2.5</span> TempIDs as a form of personal information</h4>
 <div class="outline-text-4" id="text-5-2-5">
 <p>
 As discussed previously, TempIDs can only be linked to a permanent user ID
@@ -688,7 +696,7 @@ identifying information.
 
 <p>
 TempIDs are created by the remote server, and downloaded via a Firebase
-function call (see Section <a href="#org077dc54">7.3</a> for more details). We assume that
+function call (see Section <a href="#org26fe229">7.3</a> for more details). We assume that
 the remote server and Firebase transport are secure. The downloaded
 TempIDs are kept in a local store managed by TempIDManager.
 </p>
@@ -722,7 +730,7 @@ data private to BlueTrace.
 
 <p>
 In such a situation, an attacker <i>would</i> be able to access the local
-TempID store. As detailed in Section <a href="#org077dc54">7.3</a>, the store is backed by
+TempID store. As detailed in Section <a href="#org26fe229">7.3</a>, the store is backed by
 a file <code>tempIDs</code>, which contains a JSON-serialized list of TempIDs. There
 are usually enough TempIDs to last over a 24 hour period. TempIDs that
 have expired are not removed; they will only be removed when the file is
@@ -748,8 +756,8 @@ privileges could conduct.
 </div>
 </div>
 
-<div id="outline-container-orgb535fd5" class="outline-4">
-<h4 id="orgb535fd5"><span class="section-number-4">5.2.6</span> TempID Exposure Attack</h4>
+<div id="outline-container-orgad20f94" class="outline-4">
+<h4 id="orgad20f94"><span class="section-number-4">5.2.6</span> TempID Exposure Attack</h4>
 <div class="outline-text-4" id="text-5-2-6">
 <p>
 Consider devices A and B. Let the critical period be the time interval in
@@ -824,8 +832,8 @@ stack.
 </div>
 </div>
 
-<div id="outline-container-orgb5e7568" class="outline-4">
-<h4 id="orgb5e7568"><span class="section-number-4">5.2.7</span> Use of location information</h4>
+<div id="outline-container-orgcdcb1c9" class="outline-4">
+<h4 id="orgcdcb1c9"><span class="section-number-4">5.2.7</span> Use of location information</h4>
 <div class="outline-text-4" id="text-5-2-7">
 <p>
 As mentioned above, BlueTrace is designed to not keep track of a user's
@@ -854,8 +862,8 @@ that appears to do this.
 </div>
 </div>
 
-<div id="outline-container-org5fbe6a3" class="outline-4">
-<h4 id="org5fbe6a3"><span class="section-number-4">5.2.8</span> Analytics and Metadata</h4>
+<div id="outline-container-org2b49ead" class="outline-4">
+<h4 id="org2b49ead"><span class="section-number-4">5.2.8</span> Analytics and Metadata</h4>
 <div class="outline-text-4" id="text-5-2-8">
 <p>
 BlueTrace contains two components that collect and send metadata to the
@@ -870,11 +878,11 @@ contact tracing.
 </p>
 
 <p>
-As described in Section <a href="#orgbdaec54">2.2.2</a>, BlueTrace periodically collects contact
+As described in Section <a href="#orge32d37c">2.2.2</a>, BlueTrace periodically collects contact
 tracing statistics and sends them back to the server. This happens either
 after new TempIDs are downloaded, or when a specific Firebase Cloud
-Message is received (see Section <a href="#org9bac042">5.2.10</a> below, and
-Section <a href="#orga65ccb9">7.7</a>). In either case, simple data about the system state,
+Message is received (see Section <a href="#orgcba97f5">5.2.10</a> below, and
+Section <a href="#orgb122c4a">7.7</a>). In either case, simple data about the system state,
 the number of contact tracing records collected over the previous day, and
 the timestamp of the latest record collected are sent to the server.
 </p>
@@ -890,8 +898,8 @@ not consider this to be a significant breach of privacy.
 </div>
 </div>
 
-<div id="outline-container-org66bafa9" class="outline-4">
-<h4 id="org66bafa9"><span class="section-number-4">5.2.9</span> Analysis of Firebase sinks</h4>
+<div id="outline-container-org979a35d" class="outline-4">
+<h4 id="org979a35d"><span class="section-number-4">5.2.9</span> Analysis of Firebase sinks</h4>
 <div class="outline-text-4" id="text-5-2-9">
 <p>
 In addition to the above source analyses, we also inspected all places in
@@ -912,25 +920,25 @@ Both of these cases are as expected.
 </div>
 </div>
 
-<div id="outline-container-org9bac042" class="outline-4">
-<h4 id="org9bac042"><span class="section-number-4">5.2.10</span> Remote command activation</h4>
+<div id="outline-container-orgcba97f5" class="outline-4">
+<h4 id="orgcba97f5"><span class="section-number-4">5.2.10</span> Remote command activation</h4>
 <div class="outline-text-4" id="text-5-2-10">
 <p>
 BlueTrace contains a feature that allows the server to remotely issue
-commands to client devices (see <a href="#orga65ccb9">7.7</a> for more details). The list of
-possible commands and what they do can be found in Section <a href="#org25ab4b9">7.2.7</a>; they consist of commands that start BlueTrace, start scanning
+commands to client devices (see <a href="#orgb122c4a">7.7</a> for more details). The list of
+possible commands and what they do can be found in Section <a href="#org0a8e721">7.2.7</a>; they consist of commands that start BlueTrace, start scanning
 or advertising, and so on. This is not of much concern, as those actions
 already happen regularly on the device.
 </p>
 </div>
 
-<div id="outline-container-org137a904" class="outline-5">
-<h5 id="org137a904"><span class="section-number-5">5.2.10.1</span> Remote Unpausing</h5>
+<div id="outline-container-orgb930bb0" class="outline-5">
+<h5 id="orgb930bb0"><span class="section-number-5">5.2.10.1</span> Remote Unpausing</h5>
 <div class="outline-text-5" id="text-5-2-10-1">
 <p>
 One particular command we were concerned about was the <code>ACTION_USER_PAUSE</code>
 command. This command is used not only to pause BlueTrace, but also to
-<i>unpause</i> it (see Section <a href="#org25ab4b9">7.2.7</a>, <code>ACTION_USER_PAUSE</code>). If a
+<i>unpause</i> it (see Section <a href="#org0a8e721">7.2.7</a>, <code>ACTION_USER_PAUSE</code>). If a
 user has paused BlueTrace because they do not want their contact tracing
 information to be collected, it would be unacceptable that the server
 could then unpause BlueTrace and resume collection.
@@ -950,14 +958,14 @@ arguments would then inadvertently enable remote unpausing. We recommend
 that FCMService make an explicit check on the command index specified by
 the remote server, and ignore it if it is <code>ACTION_USER_PAUSE</code>. This would
 give users more certainty that BlueTrace will always honour the pause
-setting. We discuss the pause feature further in Section <a href="#orgd17ea62">5.2.12</a> (Pausing).
+setting. We discuss the pause feature further in Section <a href="#org22af853">5.2.12</a> (Pausing).
 </p>
 </div>
 </div>
 </div>
 
-<div id="outline-container-org77792e0" class="outline-4">
-<h4 id="org77792e0"><span class="section-number-4">5.2.11</span> Threat scenarios</h4>
+<div id="outline-container-org6f6b168" class="outline-4">
+<h4 id="org6f6b168"><span class="section-number-4">5.2.11</span> Threat scenarios</h4>
 <div class="outline-text-4" id="text-5-2-11">
 <p>
 We now consider a few specific threat scenarios specific to privacy
@@ -969,8 +977,8 @@ with each other.
 </p>
 </div>
 
-<div id="outline-container-org3ef87b2" class="outline-5">
-<h5 id="org3ef87b2"><span class="section-number-5">5.2.11.1</span> Proximate Malicious User</h5>
+<div id="outline-container-orgfc57214" class="outline-5">
+<h5 id="orgfc57214"><span class="section-number-5">5.2.11.1</span> Proximate Malicious User</h5>
 <div class="outline-text-5" id="text-5-2-11-1">
 <p>
 Consider a malicious user Carol, with one or more rogue devices that
@@ -987,8 +995,8 @@ TempIDs also do not reveal whether or not Alice and Bob have met.
 </div>
 </div>
 
-<div id="outline-container-org096e597" class="outline-5">
-<h5 id="org096e597"><span class="section-number-5">5.2.11.2</span> Compromised Client</h5>
+<div id="outline-container-org4ec3721" class="outline-5">
+<h5 id="org4ec3721"><span class="section-number-5">5.2.11.2</span> Compromised Client</h5>
 <div class="outline-text-5" id="text-5-2-11-2">
 <p>
 Now consider an attacker Dan, who is able to compromise Alice's device in
@@ -1014,7 +1022,7 @@ obtain personal identification information.</li>
 <p>
 Dan would also have access to Alice's <code>tempIDs</code> file. If he is able to
 compromise Bob's device as well, he would be able to conduct the attack
-described in <a href="#orgb535fd5">5.2.6</a>.
+described in <a href="#orgad20f94">5.2.6</a>.
 </p>
 
 <p>
@@ -1025,8 +1033,8 @@ prove that they have met.
 </div>
 </div>
 
-<div id="outline-container-org081d8ce" class="outline-5">
-<h5 id="org081d8ce"><span class="section-number-5">5.2.11.3</span> Firebase Eavesdropper</h5>
+<div id="outline-container-orgb254212" class="outline-5">
+<h5 id="orgb254212"><span class="section-number-5">5.2.11.3</span> Firebase Eavesdropper</h5>
 <div class="outline-text-5" id="text-5-2-11-3">
 <p>
 Next, consider an attacker Eve, who is able to eavesdrop on the traffic
@@ -1051,8 +1059,8 @@ location.
 </div>
 </div>
 
-<div id="outline-container-org19f3bf1" class="outline-5">
-<h5 id="org19f3bf1"><span class="section-number-5">5.2.11.4</span> Compromised Server</h5>
+<div id="outline-container-orgad5ec62" class="outline-5">
+<h5 id="orgad5ec62"><span class="section-number-5">5.2.11.4</span> Compromised Server</h5>
 <div class="outline-text-5" id="text-5-2-11-4">
 <p>
 Consider an attacker Frank, that is able to compromise the server
@@ -1081,8 +1089,8 @@ then be able to access their contact tracing records.
 </div>
 </div>
 
-<div id="outline-container-org4e5fbaa" class="outline-5">
-<h5 id="org4e5fbaa"><span class="section-number-5">5.2.11.5</span> Government Surveillance</h5>
+<div id="outline-container-org8952266" class="outline-5">
+<h5 id="org8952266"><span class="section-number-5">5.2.11.5</span> Government Surveillance</h5>
 <div class="outline-text-5" id="text-5-2-11-5">
 <p>
 Finally, consider a government-sponsored attacker Grace. Grace is able to
@@ -1112,8 +1120,8 @@ government <sup><a id="fnr.5" class="footref" href="#fn.5">5</a></sup>.
 </div>
 </div>
 
-<div id="outline-container-orgabfb54a" class="outline-5">
-<h5 id="orgabfb54a"><span class="section-number-5">5.2.11.6</span> Discussion</h5>
+<div id="outline-container-org65896fc" class="outline-5">
+<h5 id="org65896fc"><span class="section-number-5">5.2.11.6</span> Discussion</h5>
 <div class="outline-text-5" id="text-5-2-11-6">
 <p>
 As can be seen from the above scenarios, the partial decentralization
@@ -1125,8 +1133,8 @@ personal information.
 </div>
 </div>
 
-<div id="outline-container-orgd17ea62" class="outline-4">
-<h4 id="orgd17ea62"><span class="section-number-4">5.2.12</span> Other privacy features</h4>
+<div id="outline-container-org22af853" class="outline-4">
+<h4 id="org22af853"><span class="section-number-4">5.2.12</span> Other privacy features</h4>
 <div class="outline-text-4" id="text-5-2-12">
 <p>
 We go through a few other privacy-centric features of BlueTrace, and
@@ -1134,21 +1142,21 @@ whether they are implemented correctly.
 </p>
 </div>
 
-<div id="outline-container-org2f05401" class="outline-5">
-<h5 id="org2f05401"><span class="section-number-5">5.2.12.1</span> Data purging</h5>
+<div id="outline-container-org237b2f2" class="outline-5">
+<h5 id="org237b2f2"><span class="section-number-5">5.2.12.1</span> Data purging</h5>
 <div class="outline-text-5" id="text-5-2-12-1">
 <p>
 BlueTrace removes contact tracing records that are older than 21 days, as
 older records are not useful for contact tracing. We verified that the
 BlueTrace code does correctly remove old records. For more details, see
-the Sections <a href="#org25ab4b9">7.2.7</a> (<code>ACTION_PURGE</code>) and
-<a href="#org0b44d61">7.4.5</a>.
+the Sections <a href="#org0a8e721">7.2.7</a> (<code>ACTION_PURGE</code>) and
+<a href="#org09ef796">7.4.5</a>.
 </p>
 </div>
 </div>
 
-<div id="outline-container-org148daf0" class="outline-5">
-<h5 id="org148daf0"><span class="section-number-5">5.2.12.2</span> Pausing</h5>
+<div id="outline-container-org79d3727" class="outline-5">
+<h5 id="org79d3727"><span class="section-number-5">5.2.12.2</span> Pausing</h5>
 <div class="outline-text-5" id="text-5-2-12-2">
 <p>
 Another privacy-related feature is pausing. A user can pause BlueTrace for
@@ -1156,11 +1164,11 @@ a set amount of time through the user interface. We verified that
 BlueTrace correctly suspends scanning and advertising services during the
 period where it is paused, except for any scanning and advertising that
 might be in progress at the point of pausing. No contact tracing records
-are sent or received while paused. See Section <a href="#orga8a6cf9">7.2.10</a> for a full analysis.
+are sent or received while paused. See Section <a href="#orgef0cb89">7.2.10</a> for a full analysis.
 </p>
 
 <p>
-As mentioned in the Section <a href="#org9bac042">5.2.10</a>, in the version
+As mentioned in the Section <a href="#orgcba97f5">5.2.10</a>, in the version
 of BlueTrace we analyzed, it is not possible for the remote server to
 unpause BlueTrace.
 </p>
@@ -1177,8 +1185,8 @@ take place.
 </div>
 
 
-<div id="outline-container-org2b1c464" class="outline-3">
-<h3 id="org2b1c464"><span class="section-number-3">5.3</span> Security</h3>
+<div id="outline-container-orga59fb7c" class="outline-3">
+<h3 id="orga59fb7c"><span class="section-number-3">5.3</span> Security</h3>
 <div class="outline-text-3" id="text-5-3">
 <p>
 BlueTrace is an app constantly sending and receiving data from other
@@ -1188,8 +1196,8 @@ quickly compromised in a short period of time.
 </p>
 </div>
 
-<div id="outline-container-org933a336" class="outline-4">
-<h4 id="org933a336"><span class="section-number-4">5.3.1</span> Threat Model</h4>
+<div id="outline-container-org644ff45" class="outline-4">
+<h4 id="org644ff45"><span class="section-number-4">5.3.1</span> Threat Model</h4>
 <div class="outline-text-4" id="text-5-3-1">
 <p>
 We assume an attacker that is able to place one or more devices in close
@@ -1208,8 +1216,8 @@ the end user.
 </div>
 </div>
 
-<div id="outline-container-org13f12a2" class="outline-4">
-<h4 id="org13f12a2"><span class="section-number-4">5.3.2</span> Attack Surface</h4>
+<div id="outline-container-orga9d56af" class="outline-4">
+<h4 id="orga9d56af"><span class="section-number-4">5.3.2</span> Attack Surface</h4>
 <div class="outline-text-4" id="text-5-3-2">
 <p>
 Given our threat model, the attack surface consists of BLE layer messages
@@ -1239,8 +1247,8 @@ not it can be used to compromise the target.
 </div>
 </div>
 
-<div id="outline-container-org449764e" class="outline-4">
-<h4 id="org449764e"><span class="section-number-4">5.3.3</span> Advertisements</h4>
+<div id="outline-container-orgbbf00bc" class="outline-4">
+<h4 id="orgbbf00bc"><span class="section-number-4">5.3.3</span> Advertisements</h4>
 <div class="outline-text-4" id="text-5-3-3">
 <p>
 StreetPassScanner is the BlueTrace component that manages scanning of
@@ -1260,13 +1268,13 @@ the manufacturer-specific data is never accessed.
 </p>
 
 <p>
-Please refer to Section <a href="#orgbdd8ff1">7.4.1</a> for more details.
+Please refer to Section <a href="#org1887ee5">7.4.1</a> for more details.
 </p>
 </div>
 </div>
 
-<div id="outline-container-orged63e87" class="outline-4">
-<h4 id="orged63e87"><span class="section-number-4">5.3.4</span> Central Characteristic Read</h4>
+<div id="outline-container-orgf065729" class="outline-4">
+<h4 id="orgf065729"><span class="section-number-4">5.3.4</span> Central Characteristic Read</h4>
 <div class="outline-text-4" id="text-5-3-4">
 <p>
 StreetPassWorker manages the exchange of contact tracing records when a
@@ -1281,7 +1289,7 @@ by this operation is an untrusted byte array.
 <i>CentralGattCallback</i> will eventually decode the value byte array into a
 UTF-8 string, and then deserialize it as a JSON string (using the Gson
 library), into a <i>V2ReadRequestPayload</i> object. Please see Sections
-<a href="#org3420dac">7.4.2</a> (CentralGattCallback) and <a href="#orge817835">7.5</a> for more
+<a href="#orgcd3f8ad">7.4.2</a> (CentralGattCallback) and <a href="#org8c1ca39">7.5</a> for more
 details.
 </p>
 
@@ -1300,13 +1308,13 @@ saved to the database.
 <p>
 From this point, the values within the database are generally not
 accessed, except when uploaded to the server for contact tracing. See
-Section <a href="#org0b44d61">7.4.5</a> (Data Access Analysis) for more details.
+Section <a href="#org09ef796">7.4.5</a> (Data Access Analysis) for more details.
 </p>
 </div>
 </div>
 
-<div id="outline-container-org4ea2f3b" class="outline-4">
-<h4 id="org4ea2f3b"><span class="section-number-4">5.3.5</span> Peripheral Characteristic Write</h4>
+<div id="outline-container-org8db13bf" class="outline-4">
+<h4 id="org8db13bf"><span class="section-number-4">5.3.5</span> Peripheral Characteristic Write</h4>
 <div class="outline-text-4" id="text-5-3-5">
 <p>
 StreetPassServer manages the exchange of contact tracing records when a
@@ -1323,8 +1331,8 @@ to the <code>saveDataReceived()</code> function, which will ultimately decode th
 byte array into a UTF-8 string, and then deserialize it as a JSON string
 (using the Gson library), into a <i>V2WriteRequestPayload</i> object. Note that
 this is symmetric to the processing happening in the Central Read data
-flow. Please see Sections <a href="#org874acb1">7.4.4</a> (GattServer Callbacks) and
-<a href="#orge817835">7.5</a> for more details.
+flow. Please see Sections <a href="#org14be005">7.4.4</a> (GattServer Callbacks) and
+<a href="#org8c1ca39">7.5</a> for more details.
 </p>
 
 <p>
@@ -1341,8 +1349,8 @@ point on will generally not be accessed.
 </div>
 </div>
 
-<div id="outline-container-orgc04c86e" class="outline-4">
-<h4 id="orgc04c86e"><span class="section-number-4">5.3.6</span> Deserialization</h4>
+<div id="outline-container-org14b2142" class="outline-4">
+<h4 id="org14b2142"><span class="section-number-4">5.3.6</span> Deserialization</h4>
 <div class="outline-text-4" id="text-5-3-6">
 <p>
 Deserialization is often a source of vulnerabilities in Java code. We took
@@ -1372,8 +1380,8 @@ sequence of fixed-width values.
 </div>
 </div>
 
-<div id="outline-container-org4b8b076" class="outline-4">
-<h4 id="org4b8b076"><span class="section-number-4">5.3.7</span> SQL Attacks</h4>
+<div id="outline-container-org4875a74" class="outline-4">
+<h4 id="org4875a74"><span class="section-number-4">5.3.7</span> SQL Attacks</h4>
 <div class="outline-text-4" id="text-5-3-7">
 <p>
 As untrusted data ultimately gets written into the database, we also
@@ -1384,8 +1392,8 @@ should not be possible to conduct an SQL injection attack or similar.
 </div>
 </div>
 
-<div id="outline-container-org398f8c1" class="outline-4">
-<h4 id="org398f8c1"><span class="section-number-4">5.3.8</span> Minor Bugs</h4>
+<div id="outline-container-org320b72a" class="outline-4">
+<h4 id="org320b72a"><span class="section-number-4">5.3.8</span> Minor Bugs</h4>
 <div class="outline-text-4" id="text-5-3-8">
 <p>
 We discovered a few minor bugs in BlueTrace, that do not have any impact
@@ -1404,8 +1412,8 @@ write is ignored.</li>
 </div>
 </div>
 
-<div id="outline-container-org3185586" class="outline-4">
-<h4 id="org3185586"><span class="section-number-4">5.3.9</span> Discussion</h4>
+<div id="outline-container-orgb626246" class="outline-4">
+<h4 id="orgb626246"><span class="section-number-4">5.3.9</span> Discussion</h4>
 <div class="outline-text-4" id="text-5-3-9">
 <p>
 As can be seen in the above analysis, we did not find any vulnerabilities
@@ -1421,8 +1429,8 @@ that BlueTrace is written securely.
 </div>
 
 
-<div id="outline-container-org8026026" class="outline-2">
-<h2 id="org8026026"><span class="section-number-2">6</span> Conclusion and Future Work</h2>
+<div id="outline-container-orgb8dc1ee" class="outline-2">
+<h2 id="orgb8dc1ee"><span class="section-number-2">6</span> Conclusion and Future Work</h2>
 <div class="outline-text-2" id="text-6">
 <p>
 Based on our investigation, we conclude that:
@@ -1453,8 +1461,8 @@ user and if any of these APIs leak information</li>
 </div>
 </div>
 
-<div id="outline-container-orgb1f5fc8" class="outline-2">
-<h2 id="orgb1f5fc8"><span class="section-number-2">7</span> Detailed Investigation</h2>
+<div id="outline-container-org6b9693a" class="outline-2">
+<h2 id="org6b9693a"><span class="section-number-2">7</span> Detailed Investigation</h2>
 <div class="outline-text-2" id="text-7">
 <p>
 In this section, we go through each component of BlueTrace in detail. Note
@@ -1463,12 +1471,12 @@ the BlueTrace Android application, and not on the OpenTrace source code.
 </p>
 </div>
 
-<div id="outline-container-orgecb9f7a" class="outline-3">
-<h3 id="orgecb9f7a"><span class="section-number-3">7.1</span> Overview</h3>
+<div id="outline-container-org4e31e4b" class="outline-3">
+<h3 id="org4e31e4b"><span class="section-number-3">7.1</span> Overview</h3>
 <div class="outline-text-3" id="text-7-1">
 </div>
-<div id="outline-container-org7d2119a" class="outline-4">
-<h4 id="org7d2119a"><span class="section-number-4">7.1.1</span> Main Components</h4>
+<div id="outline-container-orgf9cdcd7" class="outline-4">
+<h4 id="orgf9cdcd7"><span class="section-number-4">7.1.1</span> Main Components</h4>
 <div class="outline-text-4" id="text-7-1-1">
 <p>
 BlueTrace's backend implementation can be divided into six major components:
@@ -1511,8 +1519,8 @@ debugging purposes that are not normally accessible.</li>
 </div>
 </div>
 
-<div id="outline-container-org2378466" class="outline-4">
-<h4 id="org2378466"><span class="section-number-4">7.1.2</span> Event Model</h4>
+<div id="outline-container-org34828d2" class="outline-4">
+<h4 id="org34828d2"><span class="section-number-4">7.1.2</span> Event Model</h4>
 <div class="outline-text-4" id="text-7-1-2">
 <p>
 Android apps are event-driven: apps handle intents sent from within the
@@ -1529,8 +1537,8 @@ events:
 </div>
 </div>
 
-<div id="outline-container-orgcc7d870" class="outline-4">
-<h4 id="orgcc7d870"><span class="section-number-4">7.1.3</span> Data Model</h4>
+<div id="outline-container-orgd7f3fb4" class="outline-4">
+<h4 id="orgd7f3fb4"><span class="section-number-4">7.1.3</span> Data Model</h4>
 <div class="outline-text-4" id="text-7-1-3">
 <p>
 BlueTrace processes contact tracing records. These records are a log of
@@ -1592,8 +1600,8 @@ contain the following fields:
 </div>
 </div>
 
-<div id="outline-container-org8565b1b" class="outline-4">
-<h4 id="org8565b1b"><span class="section-number-4">7.1.4</span> Build Configuration</h4>
+<div id="outline-container-org99c9940" class="outline-4">
+<h4 id="org99c9940"><span class="section-number-4">7.1.4</span> Build Configuration</h4>
 <div class="outline-text-4" id="text-7-1-4">
 <p>
 As we reverse engineered the compiled version of BlueTrace, configuration
@@ -1606,8 +1614,8 @@ evidence those values originated from a build configuration. For example,
 </div>
 </div>
 
-<div id="outline-container-orgc21c3aa" class="outline-3">
-<h3 id="orgc21c3aa"><span class="section-number-3">7.2</span> BluetoothMonitoringService</h3>
+<div id="outline-container-org484e40a" class="outline-3">
+<h3 id="org484e40a"><span class="section-number-3">7.2</span> BluetoothMonitoringService</h3>
 <div class="outline-text-3" id="text-7-2">
 <p>
 BluetoothMonitoringService is the top-level service in BlueTrace. The
@@ -1627,8 +1635,8 @@ running, and then <code>onStartCommand()</code> with the associated intent.
 </p>
 </div>
 
-<div id="outline-container-org9af2b9f" class="outline-4">
-<h4 id="org9af2b9f"><span class="section-number-4">7.2.1</span> SwiftMED</h4>
+<div id="outline-container-orge3d3a3a" class="outline-4">
+<h4 id="orge3d3a3a"><span class="section-number-4">7.2.1</span> SwiftMED</h4>
 <div class="outline-text-4" id="text-7-2-1">
 <p>
 BlueTrace makes reference to a separate app called SwiftMED
@@ -1639,8 +1647,8 @@ of SwiftMED and disables BlueTrace while it is installed.
 </div>
 </div>
 
-<div id="outline-container-org3c266f5" class="outline-4">
-<h4 id="org3c266f5"><span class="section-number-4">7.2.2</span> Initialization</h4>
+<div id="outline-container-orgce73cd0" class="outline-4">
+<h4 id="orgce73cd0"><span class="section-number-4">7.2.2</span> Initialization</h4>
 <div class="outline-text-4" id="text-7-2-2">
 <p>
 When a new BMS instance is created, <code>onCreate()</code> is called. This function
@@ -1678,8 +1686,8 @@ using <code>TempIDManager.retrieveTemporaryID()</code>.</li>
 </div>
 </div>
 
-<div id="outline-container-org0237c39" class="outline-4">
-<h4 id="org0237c39"><span class="section-number-4">7.2.3</span> Event Handling</h4>
+<div id="outline-container-org13d4a1b" class="outline-4">
+<h4 id="org13d4a1b"><span class="section-number-4">7.2.3</span> Event Handling</h4>
 <div class="outline-text-4" id="text-7-2-3">
 <p>
 BMS's main event handler is a function called <code>runService()</code>, which
@@ -1690,8 +1698,8 @@ messages eventually create <i>Commands</i> which are passed in to
 </div>
 </div>
 
-<div id="outline-container-org9794908" class="outline-4">
-<h4 id="org9794908"><span class="section-number-4">7.2.4</span> Command Objects</h4>
+<div id="outline-container-orge7cc25e" class="outline-4">
+<h4 id="orge7cc25e"><span class="section-number-4">7.2.4</span> Command Objects</h4>
 <div class="outline-text-4" id="text-7-2-4">
 <p>
 <i>Command</i> is an enumeration class, representing possible actions that can be
@@ -1775,13 +1783,13 @@ These are the known <i>Command</i> indices in BlueTrace version 2.0.15:
 </div>
 </div>
 
-<div id="outline-container-org22a9cd7" class="outline-4">
-<h4 id="org22a9cd7"><span class="section-number-4">7.2.5</span> Intent Handling</h4>
+<div id="outline-container-orgcaa27cc" class="outline-4">
+<h4 id="orgcaa27cc"><span class="section-number-4">7.2.5</span> Intent Handling</h4>
 <div class="outline-text-4" id="text-7-2-5">
 <p>
 Intents sent to BMS are handled via <code>onStartCommand()</code>. This function
 extracts a BMS <i>Command</i> from the intent's extra data as described in
-<a href="#org9794908">7.2.4</a>. If no intent is supplied (possible when
+<a href="#orge7cc25e">7.2.4</a>. If no intent is supplied (possible when
 <code>onStartCommand()</code> is called to restart the service due to the
 <code>START_STICKY</code> flag, see documentation of <code>Service.onStartCommand</code>), or if
 the intent does not contain a <i>Command</i> index, then the <i>Command</i> is set to
@@ -1799,7 +1807,7 @@ be paused.
 If BlueTrace is to be paused, <code>onStartCommand()</code> will return immediately,
 <i>except if the Command associated with the intent is
 <code>ACTION_USER_PAUSE</code></i>. For more details on pausing, please see Section
-<a href="#orga8a6cf9">7.2.10</a>.
+<a href="#orgef0cb89">7.2.10</a>.
 </p>
 
 <p>
@@ -1816,8 +1824,8 @@ Finally, if the intent is not null, <code>runService()</code> will be called wit
 </div>
 </div>
 
-<div id="outline-container-org28ecf1f" class="outline-4">
-<h4 id="org28ecf1f"><span class="section-number-4">7.2.6</span> Command Handler</h4>
+<div id="outline-container-orgaff76c0" class="outline-4">
+<h4 id="orgaff76c0"><span class="section-number-4">7.2.6</span> Command Handler</h4>
 <div class="outline-text-4" id="text-7-2-6">
 <p>
 <i>CommandHandler</i> (<i>services.CommandHandler</i>) is a subclass of <i>Handler</i>,
@@ -1837,8 +1845,8 @@ calling <code>runService()</code> with the <i>Command</i> and a null intent.
 </div>
 </div>
 
-<div id="outline-container-org25ab4b9" class="outline-4">
-<h4 id="org25ab4b9"><span class="section-number-4">7.2.7</span> Command Processing</h4>
+<div id="outline-container-org0a8e721" class="outline-4">
+<h4 id="org0a8e721"><span class="section-number-4">7.2.7</span> Command Processing</h4>
 <div class="outline-text-4" id="text-7-2-7">
 <p>
 Actual processing of commands takes place in the <code>runService()</code> function.
@@ -1857,8 +1865,8 @@ Otherwise, the <i>Command</i> will be processed as per below.
 </p>
 </div>
 
-<div id="outline-container-org7f9d4a3" class="outline-5">
-<h5 id="org7f9d4a3"><span class="section-number-5">7.2.7.1</span> ACTION_START</h5>
+<div id="outline-container-org98a0571" class="outline-5">
+<h5 id="org98a0571"><span class="section-number-5">7.2.7.1</span> ACTION_START</h5>
 <div class="outline-text-5" id="text-7-2-7-1">
 <p>
 <code>runService()</code> calls <code>setupService()</code>, which creates the following
@@ -1902,8 +1910,8 @@ retrieved using <code>TempIDManager.retrieveTemporaryID</code> and used to set
 </div>
 </div>
 
-<div id="outline-container-org0475e9a" class="outline-5">
-<h5 id="org0475e9a"><span class="section-number-5">7.2.7.2</span> ACTION_SCAN</h5>
+<div id="outline-container-org0140568" class="outline-5">
+<h5 id="org0140568"><span class="section-number-5">7.2.7.2</span> ACTION_SCAN</h5>
 <div class="outline-text-5" id="text-7-2-7-2">
 <p>
 The next scan is first scheduled via <i>CommandHandler</i>: an ACTION_SCAN
@@ -1934,7 +1942,7 @@ starts a scan by calling <code>StreetPassScanner.startScan()</code>, unless
 
 <p>
 The actual scan and actions relating to it are covered in Section
-<a href="#orgf8551ae">7.4</a>.
+<a href="#org1d94608">7.4</a>.
 </p>
 
 <p>
@@ -1945,20 +1953,20 @@ updated; hence we do not report behavioural changes due to this variable.
 </div>
 </div>
 
-<div id="outline-container-org939ebe8" class="outline-5">
-<h5 id="org939ebe8"><span class="section-number-5">7.2.7.3</span> ACTION_STOP</h5>
+<div id="outline-container-org6a28ba3" class="outline-5">
+<h5 id="org6a28ba3"><span class="section-number-5">7.2.7.3</span> ACTION_STOP</h5>
 <div class="outline-text-5" id="text-7-2-7-3">
 <p>
 <code>actionStop()</code> is called, which calls <code>Service.stopForeground()</code> and
 <code>Service.stopSelf()</code> to terminate the BMS service. This will eventually
 lead to a call to <code>onDestroy()</code>, which calls <code>stopService()</code>. We describe
-this in Section <a href="#org9dbbca2">7.2.8</a>.
+this in Section <a href="#org11528ec">7.2.8</a>.
 </p>
 </div>
 </div>
 
-<div id="outline-container-org74ca179" class="outline-5">
-<h5 id="org74ca179"><span class="section-number-5">7.2.7.4</span> ACTION_ADVERTISE</h5>
+<div id="outline-container-orgba2df89" class="outline-5">
+<h5 id="orgba2df89"><span class="section-number-5">7.2.7.4</span> ACTION_ADVERTISE</h5>
 <div class="outline-text-5" id="text-7-2-7-4">
 <p>
 The next advertisement is first scheduled via CommandHandler: an
@@ -1990,8 +1998,8 @@ manufacturer ID of 0x33 and data of random bytes <sup><a id="fnr.7" class="footr
 </div>
 </div>
 
-<div id="outline-container-org9010bc8" class="outline-5">
-<h5 id="org9010bc8"><span class="section-number-5">7.2.7.5</span> ACTION_SELF_CHECK</h5>
+<div id="outline-container-orge9c97a4" class="outline-5">
+<h5 id="orge9c97a4"><span class="section-number-5">7.2.7.5</span> ACTION_SELF_CHECK</h5>
 <div class="outline-text-5" id="text-7-2-7-5">
 <p>
 The next self-check (also referred to as a health check) is first
@@ -2016,7 +2024,7 @@ Next, <code>performHealthCheck()</code> is called. If location permissions are n
 available or Bluetooth is turned off, it does nothing. Otherwise, it calls
 <code>setupService()</code> to initialize the <i>StreetPassServer</i>, <i>StreetPassScanner</i>
 and <i>BLEAdvertiser</i> objects should they not already be setup (see
-Section <a href="#org7f9d4a3">7.2.7.1</a>).
+Section <a href="#org98a0571">7.2.7.1</a>).
 </p>
 
 <p>
@@ -2029,13 +2037,13 @@ scheduled if not.
 <p>
 Finally, <code>actionHealthCheck()</code> reschedules the <code>ACTION_PURGE</code> <i>Command</i> to
 be repeatedly sent <code>purgeInterval</code> (24h) after preference
-<code>LAST_PURGE_TIME</code>, as was done in <a href="#org7f9d4a3">7.2.7.1</a> <sup><a id="fnr.8" class="footref" href="#fn.8">8</a></sup>.
+<code>LAST_PURGE_TIME</code>, as was done in <a href="#org98a0571">7.2.7.1</a> <sup><a id="fnr.8" class="footref" href="#fn.8">8</a></sup>.
 </p>
 </div>
 </div>
 
-<div id="outline-container-org0876f63" class="outline-5">
-<h5 id="org0876f63"><span class="section-number-5">7.2.7.6</span> ACTION_UPDATE_BM</h5>
+<div id="outline-container-org15b7954" class="outline-5">
+<h5 id="org15b7954"><span class="section-number-5">7.2.7.6</span> ACTION_UPDATE_BM</h5>
 <div class="outline-text-5" id="text-7-2-7-6">
 <p>
 Note: "BM" here refers to broadcast message, which is another term for the
@@ -2058,8 +2066,8 @@ used to set <code>broadcastMessage</code>.
 </div>
 </div>
 
-<div id="outline-container-org89b3543" class="outline-5">
-<h5 id="org89b3543"><span class="section-number-5">7.2.7.7</span> ACTION_PAUSE_FOR_SWIFTMED</h5>
+<div id="outline-container-org72d9bf4" class="outline-5">
+<h5 id="org72d9bf4"><span class="section-number-5">7.2.7.7</span> ACTION_PAUSE_FOR_SWIFTMED</h5>
 <div class="outline-text-5" id="text-7-2-7-7">
 <p>
 This action just changes the service's notification message to reflect
@@ -2068,8 +2076,8 @@ that BlueTrace is paused due to SwiftMED.
 </div>
 </div>
 
-<div id="outline-container-orgc2f99fa" class="outline-5">
-<h5 id="orgc2f99fa"><span class="section-number-5">7.2.7.8</span> ACTION_PURGE</h5>
+<div id="outline-container-org7cd5acc" class="outline-5">
+<h5 id="org7cd5acc"><span class="section-number-5">7.2.7.8</span> ACTION_PURGE</h5>
 <div class="outline-text-5" id="text-7-2-7-8">
 <p>
 <code>actionPurge()</code> is called, which calls <code>performPurge()</code>, which starts a
@@ -2082,13 +2090,13 @@ Kotlin coroutine. The coroutine calls
 <p>
 Note that this action was removed in BlueTrace 2.1.4, with its
 functionality moved to the LightLifter component. Please see Section
-<a href="#orge1adb53">8</a> for more details.
+<a href="#orgf3dabce">8</a> for more details.
 </p>
 </div>
 </div>
 
-<div id="outline-container-org8a66f55" class="outline-5">
-<h5 id="org8a66f55"><span class="section-number-5">7.2.7.9</span> ACTION_USER_PAUSE</h5>
+<div id="outline-container-orge2113bf" class="outline-5">
+<h5 id="orge2113bf"><span class="section-number-5">7.2.7.9</span> ACTION_USER_PAUSE</h5>
 <div class="outline-text-5" id="text-7-2-7-9">
 <p>
 <code>runService()</code> first extracts the pause timestamp from the associated
@@ -2117,8 +2125,8 @@ with <i>Command</i> <code>ACTION_START</code>. This effectively unpauses BlueTra
 </div>
 </div>
 
-<div id="outline-container-org9dbbca2" class="outline-4">
-<h4 id="org9dbbca2"><span class="section-number-4">7.2.8</span> Teardown</h4>
+<div id="outline-container-org11528ec" class="outline-4">
+<h4 id="org11528ec"><span class="section-number-4">7.2.8</span> Teardown</h4>
 <div class="outline-text-4" id="text-7-2-8">
 <p>
 BMS is shut down when it receives the <code>ACTION_STOP</code> <i>Command</i>, or when other
@@ -2146,8 +2154,8 @@ Finally, StreetPassWorker is cleaned up by calling
 </div>
 </div>
 
-<div id="outline-container-org1b19dad" class="outline-4">
-<h4 id="org1b19dad"><span class="section-number-4">7.2.9</span> System Startup</h4>
+<div id="outline-container-org013267d" class="outline-4">
+<h4 id="org013267d"><span class="section-number-4">7.2.9</span> System Startup</h4>
 <div class="outline-text-4" id="text-7-2-9">
 <p>
 BMS is started on boot via the <code>BOOT_COMPLETED</code> and <code>QUICKBOOT_POWERON</code>
@@ -2159,15 +2167,15 @@ intent to BMS with the <code>ACTION_START</code> <i>Command</i> after 500ms.
 </div>
 </div>
 
-<div id="outline-container-orga8a6cf9" class="outline-4">
-<h4 id="orga8a6cf9"><span class="section-number-4">7.2.10</span> Pause Feature Implementation</h4>
+<div id="outline-container-orgef0cb89" class="outline-4">
+<h4 id="orgef0cb89"><span class="section-number-4">7.2.10</span> Pause Feature Implementation</h4>
 <div class="outline-text-4" id="text-7-2-10">
 <p>
 BMS implements BlueTrace's pause feature, via the <i>Command</i>
 <code>ACTION_USER_PAUSE</code> and the preference <code>PAUSE_UNTIL</code>. When a pause is
 requested via the UI, an <code>ACTION_USER_PAUSE</code> <i>Command</i> is sent to BMS via an
 intent, with a timestamp indicating the time at which BMS should be paused
-till. As described in Section <a href="#org8a66f55">7.2.7.9</a>, this will set the
+till. As described in Section <a href="#orge2113bf">7.2.7.9</a>, this will set the
 <code>PAUSE_UNTIL</code> preference to the timestamp. Subsequently, checks in
 <code>onStartCommand()</code> and <code>runService()</code> will avoid performing any actions
 while the time <code>PAUSE_UNTIL</code> is in the future.
@@ -2198,8 +2206,8 @@ clicks the "unpause" button in the UI.
 </div>
 </div>
 
-<div id="outline-container-orgc8b7b8b" class="outline-4">
-<h4 id="orgc8b7b8b"><span class="section-number-4">7.2.11</span> SwiftMED Detection</h4>
+<div id="outline-container-orgcf06020" class="outline-4">
+<h4 id="orgcf06020"><span class="section-number-4">7.2.11</span> SwiftMED Detection</h4>
 <div class="outline-text-4" id="text-7-2-11">
 <p>
 BMS detects when SwiftMED is installed via <i>SwiftmedInstalledReceiver</i>
@@ -2220,8 +2228,8 @@ actions are taken should SwiftMED be installed.
 </div>
 </div>
 
-<div id="outline-container-org077dc54" class="outline-3">
-<h3 id="org077dc54"><span class="section-number-3">7.3</span> TempIDManager</h3>
+<div id="outline-container-org26fe229" class="outline-3">
+<h3 id="org26fe229"><span class="section-number-3">7.3</span> TempIDManager</h3>
 <div class="outline-text-3" id="text-7-3">
 <p>
 TempIDManager manages BlueTrace TempIDs. It downloads TempIDs from a
@@ -2237,8 +2245,8 @@ should always be provided when sending that TempID to another device.
 </p>
 </div>
 
-<div id="outline-container-org20bb926" class="outline-4">
-<h4 id="org20bb926"><span class="section-number-4">7.3.1</span> TemporaryID</h4>
+<div id="outline-container-org315b122" class="outline-4">
+<h4 id="org315b122"><span class="section-number-4">7.3.1</span> TemporaryID</h4>
 <div class="outline-text-4" id="text-7-3-1">
 <p>
 TempIDs are represented using the <i>TemporaryID</i> class
@@ -2253,8 +2261,8 @@ TempIDs are represented using the <i>TemporaryID</i> class
 </div>
 </div>
 
-<div id="outline-container-orga2e2f1e" class="outline-4">
-<h4 id="orga2e2f1e"><span class="section-number-4">7.3.2</span> Populating Local TempID Store</h4>
+<div id="outline-container-org4bd67ca" class="outline-4">
+<h4 id="org4bd67ca"><span class="section-number-4">7.3.2</span> Populating Local TempID Store</h4>
 <div class="outline-text-4" id="text-7-3-2">
 <p>
 The function <code>getTemporaryIDs()</code> is used to download new TempIDs from the
@@ -2289,13 +2297,13 @@ set to the current time.
 <p>
 Upon completion of the call, whether or not successful, a callback
 registered by <code>getTemporaryIDs()</code> creates a new <i>Metrics</i> object, and
-calls <code>Metrics.upload()</code>. See Section <a href="#orgbdaec54">2.2.2</a> for more information
+calls <code>Metrics.upload()</code>. See Section <a href="#orge32d37c">2.2.2</a> for more information
 about this component.
 </p>
 </div>
 
-<div id="outline-container-org56bbd3b" class="outline-5">
-<h5 id="org56bbd3b"><span class="section-number-5">7.3.2.1</span> Keeping the store populated</h5>
+<div id="outline-container-org58533f1" class="outline-5">
+<h5 id="org58533f1"><span class="section-number-5">7.3.2.1</span> Keeping the store populated</h5>
 <div class="outline-text-5" id="text-7-3-2-1">
 <p>
 The logic for keeping the store populated mostly resides in BMS. We will
@@ -2330,8 +2338,8 @@ the local TempID store should always contain a currently valid TempID.
 </div>
 </div>
 
-<div id="outline-container-org0621fde" class="outline-4">
-<h4 id="org0621fde"><span class="section-number-4">7.3.3</span> Retrieving Valid TempID</h4>
+<div id="outline-container-org073aa5d" class="outline-4">
+<h4 id="org073aa5d"><span class="section-number-4">7.3.3</span> Retrieving Valid TempID</h4>
 <div class="outline-text-4" id="text-7-3-3">
 <p>
 Other components can ask TempIDManager for a currently valid TempID by
@@ -2349,8 +2357,8 @@ returned.
 </p>
 </div>
 
-<div id="outline-container-org49d8595" class="outline-5">
-<h5 id="org49d8595"><span class="section-number-5">7.3.3.1</span> Enforcing use of valid TempID</h5>
+<div id="outline-container-org2efc0bf" class="outline-5">
+<h5 id="org2efc0bf"><span class="section-number-5">7.3.3.1</span> Enforcing use of valid TempID</h5>
 <div class="outline-text-5" id="text-7-3-3-1">
 <p>
 The logic to ensure only valid TempIDs are sent to other devices is
@@ -2387,8 +2395,8 @@ a valid TemporaryID object.
 </div>
 </div>
 
-<div id="outline-container-orgf8551ae" class="outline-3">
-<h3 id="orgf8551ae"><span class="section-number-3">7.4</span> StreetPass</h3>
+<div id="outline-container-org1d94608" class="outline-3">
+<h3 id="org1d94608"><span class="section-number-3">7.4</span> StreetPass</h3>
 <div class="outline-text-3" id="text-7-4">
 <p>
 StreetPass is a collection of classes that manage the dissemination and
@@ -2415,8 +2423,8 @@ to the namespace <i>sg.gov.tech.bluetrace.streetpass</i>.
 </p>
 </div>
 
-<div id="outline-container-orgbdd8ff1" class="outline-4">
-<h4 id="orgbdd8ff1"><span class="section-number-4">7.4.1</span> StreetPassScanner</h4>
+<div id="outline-container-org1887ee5" class="outline-4">
+<h4 id="org1887ee5"><span class="section-number-4">7.4.1</span> StreetPassScanner</h4>
 <div class="outline-text-4" id="text-7-4-1">
 <p>
 StreetPassScanner (<code>StreetPassScanner</code>) is used to detect nearby BlueTrace
@@ -2425,8 +2433,8 @@ part of the BLE Services component, to perform the actual scanning.
 </p>
 </div>
 
-<div id="outline-container-org192f814" class="outline-5">
-<h5 id="org192f814"><span class="section-number-5">7.4.1.1</span> Initialization</h5>
+<div id="outline-container-orgd796226" class="outline-5">
+<h5 id="orgd796226"><span class="section-number-5">7.4.1.1</span> Initialization</h5>
 <div class="outline-text-5" id="text-7-4-1-1">
 <p>
 A <i>StreetPassScanner</i> object is created by BMS when processing the
@@ -2440,8 +2448,8 @@ callback object for BLE events (see documentation for
 </div>
 </div>
 
-<div id="outline-container-org66696dd" class="outline-5">
-<h5 id="org66696dd"><span class="section-number-5">7.4.1.2</span> Scanning</h5>
+<div id="outline-container-orgff7af61" class="outline-5">
+<h5 id="orgff7af61"><span class="section-number-5">7.4.1.2</span> Scanning</h5>
 <div class="outline-text-5" id="text-7-4-1-2">
 <p>
 When processing an <code>ACTION_SCAN</code> <i>Command</i>, BMS will perform a scan by
@@ -2484,8 +2492,8 @@ processing the detected device.
 </div>
 </div>
 
-<div id="outline-container-orgc89398f" class="outline-5">
-<h5 id="orgc89398f"><span class="section-number-5">7.4.1.3</span> Teardown</h5>
+<div id="outline-container-org8569ac9" class="outline-5">
+<h5 id="org8569ac9"><span class="section-number-5">7.4.1.3</span> Teardown</h5>
 <div class="outline-text-5" id="text-7-4-1-3">
 <p>
 StreetPassScanner terminates the scanning process when <code>stopScan()</code> is
@@ -2497,8 +2505,8 @@ and is also called when BMS terminates.
 </div>
 </div>
 
-<div id="outline-container-org3420dac" class="outline-4">
-<h4 id="org3420dac"><span class="section-number-4">7.4.2</span> StreetPassWorker</h4>
+<div id="outline-container-orgcd3f8ad" class="outline-4">
+<h4 id="orgcd3f8ad"><span class="section-number-4">7.4.2</span> StreetPassWorker</h4>
 <div class="outline-text-4" id="text-7-4-2">
 <p>
 StreetPassWorker manages the exchange of contact tracing records when a
@@ -2509,8 +2517,8 @@ will go through each device and exchange records as required by the protocol.
 </p>
 </div>
 
-<div id="outline-container-org36677d6" class="outline-5">
-<h5 id="org36677d6"><span class="section-number-5">7.4.2.1</span> Initialization</h5>
+<div id="outline-container-orgbb3e285" class="outline-5">
+<h5 id="orgbb3e285"><span class="section-number-5">7.4.2.1</span> Initialization</h5>
 <div class="outline-text-5" id="text-7-4-2-1">
 <p>
 A <i>StreetPassWorker</i> object is created in <code>BMS.setup()</code>. The constructor
@@ -2542,8 +2550,8 @@ the property <code>currentWork</code>.
 </div>
 </div>
 
-<div id="outline-container-org473da4c" class="outline-5">
-<h5 id="org473da4c"><span class="section-number-5">7.4.2.2</span> Work objects</h5>
+<div id="outline-container-orgb2b5f98" class="outline-5">
+<h5 id="orgb2b5f98"><span class="section-number-5">7.4.2.2</span> Work objects</h5>
 <div class="outline-text-5" id="text-7-4-2-2">
 <p>
 The <i>Work</i> class represents a unit of work that needs to be done by
@@ -2576,8 +2584,8 @@ initialized to the return value of <code>connectGatt()</code>.
 </div>
 </div>
 
-<div id="outline-container-org7493c32" class="outline-5">
-<h5 id="org7493c32"><span class="section-number-5">7.4.2.3</span> Receiving ACTION_DEVICE_SCANNED Intents</h5>
+<div id="outline-container-org2030e14" class="outline-5">
+<h5 id="org2030e14"><span class="section-number-5">7.4.2.3</span> Receiving ACTION_DEVICE_SCANNED Intents</h5>
 <div class="outline-text-5" id="text-7-4-2-3">
 <p>
 Local <code>ACTION_DEVICE_SCANNED</code> intents are received by
@@ -2595,8 +2603,8 @@ the work queue.
 </div>
 </div>
 
-<div id="outline-container-orgeedded1" class="outline-5">
-<h5 id="orgeedded1"><span class="section-number-5">7.4.2.4</span> Adding Work</h5>
+<div id="outline-container-orgb5de050" class="outline-5">
+<h5 id="orgb5de050"><span class="section-number-5">7.4.2.4</span> Adding Work</h5>
 <div class="outline-text-5" id="text-7-4-2-4">
 <p>
 <code>StreetPassWorker.addWork()</code> adds a <i>Work</i> object to the work queue, given
@@ -2631,8 +2639,8 @@ problems.
 </div>
 </div>
 
-<div id="outline-container-org2261e8c" class="outline-5">
-<h5 id="org2261e8c"><span class="section-number-5">7.4.2.5</span> Processing Work</h5>
+<div id="outline-container-orgfb02b7a" class="outline-5">
+<h5 id="orgfb02b7a"><span class="section-number-5">7.4.2.5</span> Processing Work</h5>
 <div class="outline-text-5" id="text-7-4-2-5">
 <p>
 Work in the work queue is processed when <code>StreetPassWorker.doWork()</code> is
@@ -2673,7 +2681,7 @@ process the next <i>Work</i> object.
 <p>
 Next, <code>doWork()</code> checks if there is already an active Bluetooth connection
 to the associated device. If so, the Work object is marked as skipped and
-<code>finishWork()</code> is called; see Section <a href="#org2a90ead">7.4.2.7</a>.
+<code>finishWork()</code> is called; see Section <a href="#org6f796d1">7.4.2.7</a>.
 </p>
 
 <p>
@@ -2699,8 +2707,8 @@ on to process the next work unit in the queue.
 </div>
 
 
-<div id="outline-container-org698e420" class="outline-5">
-<h5 id="org698e420"><span class="section-number-5">7.4.2.6</span> CentralGattCallback</h5>
+<div id="outline-container-orga3834ed" class="outline-5">
+<h5 id="orga3834ed"><span class="section-number-5">7.4.2.6</span> CentralGattCallback</h5>
 <div class="outline-text-5" id="text-7-4-2-6">
 <p>
 <i>CentralGattCallback</i> (<i>StreetPassWorker.CentralGattCallback</i>) manages the
@@ -2780,7 +2788,7 @@ device.
 Note that <code>onCharacteristicRead()</code> calls <code>TempIDManager.bmValid()</code>,
 supposedly to check if the TempID stored at <code>BMS.broadcastMessage</code> is
 valid for the current time, but this function always returns true. As
-detailed in Section <a href="#org077dc54">7.3</a>, ultimately the TempID used in
+detailed in Section <a href="#org26fe229">7.3</a>, ultimately the TempID used in
 contact tracing records sent out by the device are enforced to be valid
 via <code>TracerApp.thisDeviceMsg()</code>.
 </p>
@@ -2794,8 +2802,8 @@ up.
 </div>
 
 <ul class="org-ul">
-<li><a id="org4ff1a8f"></a>Closing the connection<br>
-<div class="outline-text-6" id="text-org4ff1a8f">
+<li><a id="orgf397da3"></a>Closing the connection<br>
+<div class="outline-text-6" id="text-orgf397da3">
 <p>
 <code>endWorkConnection()</code> is called whenever the connection needs to be
 terminated. It calls <code>BluetoothGatt.disconnect()</code> to disconnect from the
@@ -2823,8 +2831,8 @@ will be set to null.</li>
 </ul>
 </div>
 
-<div id="outline-container-org2a90ead" class="outline-5">
-<h5 id="org2a90ead"><span class="section-number-5">7.4.2.7</span> Finishing Work</h5>
+<div id="outline-container-org6f796d1" class="outline-5">
+<h5 id="org6f796d1"><span class="section-number-5">7.4.2.7</span> Finishing Work</h5>
 <div class="outline-text-5" id="text-7-4-2-7">
 <p>
 <i>Work</i> objects are cleaned up by calling <code>finishWork()</code>. This function
@@ -2845,8 +2853,8 @@ to process the next item on the work queue.
 </div>
 </div>
 
-<div id="outline-container-org4bb5abd" class="outline-5">
-<h5 id="org4bb5abd"><span class="section-number-5">7.4.2.8</span> Queue and Work Timeouts</h5>
+<div id="outline-container-orgc7aa81c" class="outline-5">
+<h5 id="orgc7aa81c"><span class="section-number-5">7.4.2.8</span> Queue and Work Timeouts</h5>
 <div class="outline-text-5" id="text-7-4-2-8">
 <p>
 StreetPassWorker manages the work queue and <i>Work</i> objects through two
@@ -2916,8 +2924,8 @@ a new Work object.
 </div>
 </div>
 
-<div id="outline-container-org2d9bc37" class="outline-5">
-<h5 id="org2d9bc37"><span class="section-number-5">7.4.2.9</span> Blacklist Management</h5>
+<div id="outline-container-orgb8ec936" class="outline-5">
+<h5 id="orgb8ec936"><span class="section-number-5">7.4.2.9</span> Blacklist Management</h5>
 <div class="outline-text-5" id="text-7-4-2-9">
 <p>
 <i>BlacklistReceiver</i> (<i>StreetPassWorker.BlackListReceiver</i>) is a simple
@@ -2934,8 +2942,8 @@ blacklist after a delay of <code>BMS.blacklistDuration</code> (100s).
 </div>
 </div>
 
-<div id="outline-container-orgdde3ae6" class="outline-4">
-<h4 id="orgdde3ae6"><span class="section-number-4">7.4.3</span> StreetPassReceiver</h4>
+<div id="outline-container-org7594cbb" class="outline-4">
+<h4 id="org7594cbb"><span class="section-number-4">7.4.3</span> StreetPassReceiver</h4>
 <div class="outline-text-4" id="text-7-4-3">
 <p>
 StreetPassReceiver (<i>BMS.StreetPassReceiver</i>) is a small class that is
@@ -2953,8 +2961,8 @@ is then launched to save the <i>StreetPassRecord</i>, by calling
 </div>
 </div>
 
-<div id="outline-container-org874acb1" class="outline-4">
-<h4 id="org874acb1"><span class="section-number-4">7.4.4</span> StreetPassServer</h4>
+<div id="outline-container-org14be005" class="outline-4">
+<h4 id="org14be005"><span class="section-number-4">7.4.4</span> StreetPassServer</h4>
 <div class="outline-text-4" id="text-7-4-4">
 <p>
 StreetPassServer manages the exchange of contact tracing records when a
@@ -2964,8 +2972,8 @@ processing the <code>ACTION_START</code> <i>Command</i>.
 </p>
 </div>
 
-<div id="outline-container-org82046e4" class="outline-5">
-<h5 id="org82046e4"><span class="section-number-5">7.4.4.1</span> Initialization</h5>
+<div id="outline-container-org515d2ae" class="outline-5">
+<h5 id="org515d2ae"><span class="section-number-5">7.4.4.1</span> Initialization</h5>
 <div class="outline-text-5" id="text-7-4-4-1">
 <p>
 When a <i>StreetPassServer</i> object is created by BMS, <code>serviceUUIDString</code> is
@@ -2981,8 +2989,8 @@ as a Peripheral device.
 </div>
 </div>
 
-<div id="outline-container-org03af86a" class="outline-5">
-<h5 id="org03af86a"><span class="section-number-5">7.4.4.2</span> GattServer and GattService</h5>
+<div id="outline-container-orgef13157" class="outline-5">
+<h5 id="orgef13157"><span class="section-number-5">7.4.4.2</span> GattServer and GattService</h5>
 <div class="outline-text-5" id="text-7-4-4-2">
 <p>
 GattServer (<i>bluetooth.gatt.GattServer</i>) is an implementation of a BLE
@@ -3028,8 +3036,8 @@ BlueTrace Central devices.
 </div>
 </div>
 
-<div id="outline-container-org98a5344" class="outline-5">
-<h5 id="org98a5344"><span class="section-number-5">7.4.4.3</span> GattServer Callbacks</h5>
+<div id="outline-container-org2e1736b" class="outline-5">
+<h5 id="org2e1736b"><span class="section-number-5">7.4.4.3</span> GattServer Callbacks</h5>
 <div class="outline-text-5" id="text-7-4-4-3">
 <p>
 GattServer registers an anonymous callback object, <code>gattServerCallback</code>,
@@ -3078,7 +3086,7 @@ called, but it does not do anything when the new state is
 Next, the Central requests to read the value of a characteristic,
 triggering <code>onCharacteristicReadRequest()</code>. The callback first determines
 a suitable protocol implementation (subclass of <i>BlueTraceProtocol</i>) to
-handle the requested characteristic (see Section <a href="#orge817835">7.5</a> for
+handle the requested characteristic (see Section <a href="#org8c1ca39">7.5</a> for
 more details), and uses the <code>BlueTraceProtocol.peripheral</code>
 <i>PeripheralInterface</i> object. Then, <code>readPayloadMap</code> is consulted to see
 if we have a cached copy of the Encounter Message to be sent to the
@@ -3158,8 +3166,8 @@ happens if the connection is severed before the protocol completes.
 </div>
 
 <ul class="org-ul">
-<li><a id="org51946be"></a>Bugs in long write implementation<br>
-<div class="outline-text-6" id="text-org51946be">
+<li><a id="orge388682"></a>Bugs in long write implementation<br>
+<div class="outline-text-6" id="text-orge388682">
 <p>
 There are a few minor bugs in the handling of long writes. First, in
 <code>onCharacteristicWriteRequest()</code>, the provided data is always appended to
@@ -3187,8 +3195,8 @@ they do, are unlikely to severely impact the functionality of BlueTrace.
 </ul>
 </div>
 
-<div id="outline-container-org556d425" class="outline-5">
-<h5 id="org556d425"><span class="section-number-5">7.4.4.4</span> Teardown</h5>
+<div id="outline-container-orgd82faaf" class="outline-5">
+<h5 id="orgd82faaf"><span class="section-number-5">7.4.4.4</span> Teardown</h5>
 <div class="outline-text-5" id="text-7-4-4-4">
 <p>
 StreetPassServer is cleaned up by calling <code>tearDown()</code>. This function
@@ -3200,8 +3208,8 @@ the underlying BluetoothGattServer object.
 </div>
 </div>
 
-<div id="outline-container-org0b44d61" class="outline-4">
-<h4 id="org0b44d61"><span class="section-number-4">7.4.5</span> StreetPassRecordDatabase</h4>
+<div id="outline-container-org09ef796" class="outline-4">
+<h4 id="org09ef796"><span class="section-number-4">7.4.5</span> StreetPassRecordDatabase</h4>
 <div class="outline-text-4" id="text-7-4-5">
 <p>
 StreetPassRecordDatabase (<i>persistence.*</i>) is the database providing
@@ -3234,7 +3242,7 @@ not focus on it in this report.
 <i>StreetPassRecord</i> objects hold the actual contact tracing information,
 and are backed by rows in <code>record_table</code> via the <i>StreetPassRecordDao</i>
 data access object. <i>StreetPassRecord</i> objects were already described in
-Section <a href="#orgcc7d870">7.1.3</a>; we note down the table columns corresponding to each
+Section <a href="#orgd7f3fb4">7.1.3</a>; we note down the table columns corresponding to each
 property of the object here.
 </p>
 
@@ -3318,8 +3326,8 @@ referred to as nuking the database</li>
 </ul>
 </div>
 
-<div id="outline-container-org6f44c55" class="outline-5">
-<h5 id="org6f44c55"><span class="section-number-5">7.4.5.1</span> StreetPassRecordStorage</h5>
+<div id="outline-container-orgf98d14b" class="outline-5">
+<h5 id="orgf98d14b"><span class="section-number-5">7.4.5.1</span> StreetPassRecordStorage</h5>
 <div class="outline-text-5" id="text-7-4-5-1">
 <p>
 StreetPassRecordStorage (<i>persistence.StreetPassRecordStorage</i>) is a
@@ -3336,8 +3344,8 @@ functions:
 </div>
 </div>
 
-<div id="outline-container-org3eef97b" class="outline-5">
-<h5 id="org3eef97b"><span class="section-number-5">7.4.5.2</span> Data Access Analysis</h5>
+<div id="outline-container-orgd746ad4" class="outline-5">
+<h5 id="orgd746ad4"><span class="section-number-5">7.4.5.2</span> Data Access Analysis</h5>
 <div class="outline-text-5" id="text-7-4-5-2">
 <p>
 We analyzed the callers of all database access functions in
@@ -3350,7 +3358,7 @@ used. We identified the following operations that access the database:
 the latest record</li>
 <li><b>PeekActivity</b> and <b>PlotActivity</b>, to view records, and to nuke the
 database. These are debug views that are not normally accessible. See
-Section <a href="#orga44452d">7.9</a> for more information.</li>
+Section <a href="#org35f047f">7.9</a> for more information.</li>
 <li><b>Upload Service</b>, to extract the records and upload them to the server
 after a successful PIN has been entered. The PIN ensures only a health
 authority will be able to trigger this action.</li>
@@ -3382,8 +3390,8 @@ is unlikely to pose a privacy risk.
 </div>
 </div>
 
-<div id="outline-container-org0b84127" class="outline-5">
-<h5 id="org0b84127"><span class="section-number-5">7.4.5.3</span> SQL Injection Analysis</h5>
+<div id="outline-container-org291945c" class="outline-5">
+<h5 id="org291945c"><span class="section-number-5">7.4.5.3</span> SQL Injection Analysis</h5>
 <div class="outline-text-5" id="text-7-4-5-3">
 <p>
 The SQL queries used in StreetPassRecordDatabase are created by Room at
@@ -3395,8 +3403,8 @@ an SQL injection attack from any attacker-controlled inputs.
 </div>
 </div>
 
-<div id="outline-container-orge817835" class="outline-3">
-<h3 id="orge817835"><span class="section-number-3">7.5</span> BlueTraceProtocol</h3>
+<div id="outline-container-org8c1ca39" class="outline-3">
+<h3 id="org8c1ca39"><span class="section-number-3">7.5</span> BlueTraceProtocol</h3>
 <div class="outline-text-3" id="text-7-5">
 <p>
 BlueTraceProtocol (<code>protocol.*</code>) is the implementation of the data format
@@ -3420,8 +3428,8 @@ retrieve the correct implementation for a particular version.
 </p>
 </div>
 
-<div id="outline-container-orgd6e35d5" class="outline-4">
-<h4 id="orgd6e35d5"><span class="section-number-4">7.5.1</span> BlueTraceProtocol Interface</h4>
+<div id="outline-container-org4b02b58" class="outline-4">
+<h4 id="org4b02b58"><span class="section-number-4">7.5.1</span> BlueTraceProtocol Interface</h4>
 <div class="outline-text-4" id="text-7-5-1">
 <p>
 The parent class <i>BlueTraceProtocol</i> contains the following properties:
@@ -3465,8 +3473,8 @@ Messages sent/received via GATT, and <i>ConnectionRecord</i> objects.
 </div>
 </div>
 
-<div id="outline-container-org2941ca2" class="outline-4">
-<h4 id="org2941ca2"><span class="section-number-4">7.5.2</span> Version 2 Implementation</h4>
+<div id="outline-container-orgc7cdd36" class="outline-4">
+<h4 id="orgc7cdd36"><span class="section-number-4">7.5.2</span> Version 2 Implementation</h4>
 <div class="outline-text-4" id="text-7-5-2">
 <p>
 BlueTrace version 2.0.15 contains only one protocol implementation, for
@@ -3483,8 +3491,8 @@ the version 2 Encounter Messages.
 </p>
 </div>
 
-<div id="outline-container-org19b585a" class="outline-5">
-<h5 id="org19b585a"><span class="section-number-5">7.5.2.1</span> V2ReadRequestPayload</h5>
+<div id="outline-container-orgd8b33fa" class="outline-5">
+<h5 id="orgd8b33fa"><span class="section-number-5">7.5.2.1</span> V2ReadRequestPayload</h5>
 <div class="outline-text-5" id="text-7-5-2-1">
 <p>
 <i>V2ReadRequestPayload</i> represents Encounter Messages sent by Peripheral
@@ -3507,8 +3515,8 @@ encoding the string.
 </div>
 </div>
 
-<div id="outline-container-org9c4a499" class="outline-5">
-<h5 id="org9c4a499"><span class="section-number-5">7.5.2.2</span> V2WriteRequestPayload</h5>
+<div id="outline-container-orgddca6a3" class="outline-5">
+<h5 id="orgddca6a3"><span class="section-number-5">7.5.2.2</span> V2WriteRequestPayload</h5>
 <div class="outline-text-5" id="text-7-5-2-2">
 <p>
 <i>V2WriteRequestPayload</i> represents Encounter Messages sent by Central
@@ -3524,8 +3532,8 @@ for encoding and serialization.
 </div>
 </div>
 
-<div id="outline-container-org291be3c" class="outline-5">
-<h5 id="org291be3c"><span class="section-number-5">7.5.2.3</span> V2Central and V2Peripheral</h5>
+<div id="outline-container-org3d76128" class="outline-5">
+<h5 id="org3d76128"><span class="section-number-5">7.5.2.3</span> V2Central and V2Peripheral</h5>
 <div class="outline-text-5" id="text-7-5-2-3">
 <p>
 The implementations of <i>V2Central</i> and <i>V2Peripheral</i> are straightforward.
@@ -3567,8 +3575,8 @@ into a <i>V2WriteRequestPayload</i> object using
 </div>
 </div>
 
-<div id="outline-container-org67db5ff" class="outline-4">
-<h4 id="org67db5ff"><span class="section-number-4">7.5.3</span> Protocol Selection</h4>
+<div id="outline-container-org1d6f692" class="outline-4">
+<h4 id="org1d6f692"><span class="section-number-4">7.5.3</span> Protocol Selection</h4>
 <div class="outline-text-4" id="text-7-5-3">
 <p>
 BlueTraceProtocol contains a protocol selection class named <i>BlueTrace</i>
@@ -3580,7 +3588,7 @@ characteristic UUID. For the sake of clarity, we will refer to this
 <p>
 As per the BlueTrace protocol design, each version of the protocol will
 use a unique UUID value for the characteristic to be read and written via
-GATT (see <a href="#orgf8551ae">7.4</a> for more details). The protocol selector maintains a
+GATT (see <a href="#org1d94608">7.4</a> for more details). The protocol selector maintains a
 mapping from characteristic UUID values to protocol versions, in
 <code>characteristicToProtocolVersionMap</code>; and another mapping from versions to
 implementations, in <code>implementations</code>.
@@ -3614,8 +3622,8 @@ the UUID is 117BDD58-57CE-4E7A-8E87-7CCCDDA2A804.
 </div>
 </div>
 
-<div id="outline-container-orgda8bfc2" class="outline-3">
-<h3 id="orgda8bfc2"><span class="section-number-3">7.6</span> Metrics</h3>
+<div id="outline-container-org7b93598" class="outline-3">
+<h3 id="org7b93598"><span class="section-number-3">7.6</span> Metrics</h3>
 <div class="outline-text-3" id="text-7-6">
 <p>
 BlueTrace contains a Metrics component (<i>metrics.*</i>) that periodically gathers
@@ -3655,8 +3663,8 @@ upload the gathered data to the remote server.
 </div>
 </div>
 
-<div id="outline-container-orga65ccb9" class="outline-3">
-<h3 id="orga65ccb9"><span class="section-number-3">7.7</span> FCMService</h3>
+<div id="outline-container-orgb122c4a" class="outline-3">
+<h3 id="orgb122c4a"><span class="section-number-3">7.7</span> FCMService</h3>
 <div class="outline-text-3" id="text-7-7">
 <p>
 FCMService (<i>services.FCMService</i>) is a top-level service for handling
@@ -3703,8 +3711,8 @@ displayed.
 </div>
 </div>
 
-<div id="outline-container-org20c92a0" class="outline-3">
-<h3 id="org20c92a0"><span class="section-number-3">7.8</span> User Registration</h3>
+<div id="outline-container-orgd00b580" class="outline-3">
+<h3 id="orgd00b580"><span class="section-number-3">7.8</span> User Registration</h3>
 <div class="outline-text-3" id="text-7-8">
 <p>
 When a new user installs BlueTrace on their device, they must go through a
@@ -3755,8 +3763,8 @@ At this point the user registration process is completed.
 </div>
 </div>
 
-<div id="outline-container-orga44452d" class="outline-3">
-<h3 id="orga44452d"><span class="section-number-3">7.9</span> Debug Activities</h3>
+<div id="outline-container-org35f047f" class="outline-3">
+<h3 id="org35f047f"><span class="section-number-3">7.9</span> Debug Activities</h3>
 <div class="outline-text-3" id="text-7-9">
 <p>
 BlueTrace contains two "hidden" activities, which can be found in
@@ -3802,8 +3810,8 @@ security risk.
 </div>
 </div>
 
-<div id="outline-container-orgfba7667" class="outline-3">
-<h3 id="orgfba7667"><span class="section-number-3">7.10</span> Use of Firebase in BlueTrace</h3>
+<div id="outline-container-orgbce3431" class="outline-3">
+<h3 id="orgbce3431"><span class="section-number-3">7.10</span> Use of Firebase in BlueTrace</h3>
 <div class="outline-text-3" id="text-7-10">
 <p>
 BlueTrace makes use of the Firebase platform for cloud
@@ -3830,7 +3838,7 @@ verified that none of them appear to send anything unusual.
 <p>
 Firebase Cloud Messaging (<code>messaging.*</code>) is used to send notifications and
 other kinds of messages from the server. This is described in more detail
-in Section <a href="#orga65ccb9">7.7</a>.
+in Section <a href="#orgb122c4a">7.7</a>.
 </p>
 
 <p>
@@ -3845,8 +3853,8 @@ any personal information.
 </div>
 
 
-<div id="outline-container-orge1adb53" class="outline-2">
-<h2 id="orge1adb53"><span class="section-number-2">8</span> Analysis of BlueTrace 2.1.4</h2>
+<div id="outline-container-orgf3dabce" class="outline-2">
+<h2 id="orgf3dabce"><span class="section-number-2">8</span> Analysis of BlueTrace 2.1.4</h2>
 <div class="outline-text-2" id="text-8">
 <p>
 We performed a quick differential analysis of BlueTrace 2.1.4 to
@@ -3861,8 +3869,8 @@ The following are the differences we found between the two code bases.
 </p>
 </div>
 
-<div id="outline-container-org363d9ca" class="outline-3">
-<h3 id="org363d9ca"><span class="section-number-3">8.1</span> SafeEntry Support</h3>
+<div id="outline-container-org5c0d2dc" class="outline-3">
+<h3 id="org5c0d2dc"><span class="section-number-3">8.1</span> SafeEntry Support</h3>
 <div class="outline-text-3" id="text-8-1">
 <p>
 SafeEntry is a visitor check-in system developed by GovTech that keeps
@@ -3895,12 +3903,12 @@ using a passport number.
 </p>
 </div>
 
-<div id="outline-container-orgc9d8116" class="outline-4">
-<h4 id="orgc9d8116"><span class="section-number-4">8.1.1</span> Privacy Impact</h4>
+<div id="outline-container-org1649365" class="outline-4">
+<h4 id="org1649365"><span class="section-number-4">8.1.1</span> Privacy Impact</h4>
 <div class="outline-text-4" id="text-8-1-1">
 <p>
 As BlueTrace stores SafeEntry records on disk, an attacker with privileged
-access to BlueTrace (like Dan from Section <a href="#org77792e0">5.2.11</a>) would be
+access to BlueTrace (like Dan from Section <a href="#org6f6b168">5.2.11</a>) would be
 able to determine all the locations visited by the user. SafeEntry records
 are purged every 25 days <sup><a id="fnr.11" class="footref" href="#fn.11">11</a></sup>, so there would be up to 25 days worth of check-ins exposed.
 </p>
@@ -3928,8 +3936,8 @@ individual, such as their NRIC.
 </div>
 </div>
 
-<div id="outline-container-org062fa95" class="outline-3">
-<h3 id="org062fa95"><span class="section-number-3">8.2</span> LightLifter</h3>
+<div id="outline-container-org6ccb824" class="outline-3">
+<h3 id="org6ccb824"><span class="section-number-3">8.2</span> LightLifter</h3>
 <div class="outline-text-3" id="text-8-2">
 <p>
 BlueTrace includes a new component known as LightLifter
@@ -3946,7 +3954,7 @@ repeating tasks:
 
 <p>
 The metrics upload task is identical to what is described in Section
-<a href="#orgbdaec54">2.2.2</a>. In 2.0.15, metric uploading happened after TempIDManager
+<a href="#orge32d37c">2.2.2</a>. In 2.0.15, metric uploading happened after TempIDManager
 completed downloading new TempIDs from the server, which would happen
 roughly every 12 hours. Thus this new feature would cause metrics to be
 uploaded more frequently.
@@ -3970,8 +3978,8 @@ related to <code>ACTION_PURGE</code>.
 </div>
 </div>
 
-<div id="outline-container-org3744fc5" class="outline-3">
-<h3 id="org3744fc5"><span class="section-number-3">8.3</span> Miscellaneous</h3>
+<div id="outline-container-orgbd1f23d" class="outline-3">
+<h3 id="orgbd1f23d"><span class="section-number-3">8.3</span> Miscellaneous</h3>
 <div class="outline-text-3" id="text-8-3">
 <p>
 BlueTrace 2.1.4 also includes another native library,
@@ -4007,7 +4015,7 @@ surveilled is already high, with or without BlueTrace.</p></div></div>
 
 <div class="footdef"><sup><a id="fn.6" class="footnum" href="#fnr.6">6</a></sup> <div class="footpara"><p class="footpara">This has been removed as per
 BlueTrace 2.1.4, as the purge task has been moved to LightLifter. Please
-see Section <a href="#orge1adb53">8</a> for more details.</p></div></div>
+see Section <a href="#orgf3dabce">8</a> for more details.</p></div></div>
 
 <div class="footdef"><sup><a id="fn.7" class="footnum" href="#fnr.7">7</a></sup> <div class="footpara"><p class="footpara">The
 manufacturer-specific data appears to be set for the use of iOS BlueTrace
@@ -4015,7 +4023,7 @@ devices.</p></div></div>
 
 <div class="footdef"><sup><a id="fn.8" class="footnum" href="#fnr.8">8</a></sup> <div class="footpara"><p class="footpara">This has been removed
 as per BlueTrace 2.1.4, as the purge task has been moved to
-LightLifter. Please see Section <a href="#orge1adb53">8</a> for more
+LightLifter. Please see Section <a href="#orgf3dabce">8</a> for more
 details.</p></div></div>
 
 <div class="footdef"><sup><a id="fn.9" class="footnum" href="#fnr.9">9</a></sup> <div class="footpara"><p class="footpara">BlueTrace for
@@ -4027,7 +4035,7 @@ with the iOS implementation.</p></div></div>
 we are analyzing, there is only one protocol implementation,
 <i>BlueTraceV2</i>, and it only handles the characteristic with UUID
 117BDD58-57CE-4E7A-8E87-7CCCDDA2A804, which is what is expected. See
-Section <a href="#orge817835">7.5</a> for more details.)</p></div></div>
+Section <a href="#org8c1ca39">7.5</a> for more details.)</p></div></div>
 
 <div class="footdef"><sup><a id="fn.11" class="footnum" href="#fnr.11">11</a></sup> <div class="footpara"><p class="footpara">BlueTrace 2.1.4 introduced a new component,
 LightLifter, which handles record purging, and the purge interval is set
